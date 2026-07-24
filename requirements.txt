@@ -1,4 +1,7 @@
 streamlit
 pymupdf
 python-docx
-python-dotenv
+python-dotenvsentence-transformers
+faiss-cpu
+sentence-transformers
+faiss-cpu
