@@ -5,3 +5,4 @@ python-dotenvsentence-transformers
 faiss-cpu
 sentence-transformers
 faiss-cpu
+google-generativeai
