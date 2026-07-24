@@ -6,3 +6,7 @@ faiss-cpu
 sentence-transformers
 faiss-cpu
 google-generativeai
+google-generativeai
+reportlab
+reportlab
+reportlab
