@@ -1,3 +1,5 @@
+import re
+
 import streamlit as st
 
 from src.document_loader import load_document
@@ -43,8 +45,17 @@ if uploaded_file:
         "num_references": len(parsed["references"]),
     })
 
+    
+
+    
+
     st.subheader("Section-Aware Chunks")
     if section_chunks:
         for c in section_chunks[:5]:
             st.markdown(f"**[{c['section']}] chunk {c['chunk_index']}**")
-            st.text_area(f"{c['section']}_{c['chunk_index']}", c["text"], height=120, label_visibility="collapsed")
+            st.text_area(
+                f"{c['section']}_{c['chunk_index']}",
+                c["text"],
+                height=120,
+                label_visibility="collapsed",
+            )
