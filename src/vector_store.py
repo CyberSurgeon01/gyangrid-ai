@@ -19,7 +19,7 @@ class VectorStore:
     def add_chunks(self, embedded_chunks: list):
         """
         embedded_chunks: list of {section, text, chunk_index, embedding}
-        as produced by embeddings.embed_chunks()
+        as produced by embeddings.embed_chunks()  
         """
         vectors = np.array([c["embedding"] for c in embedded_chunks], dtype="float32")
         self.index.add(vectors)
@@ -65,3 +65,5 @@ class VectorStore:
 
     def is_empty(self) -> bool:
         return self.index.ntotal == 0
+
+    
