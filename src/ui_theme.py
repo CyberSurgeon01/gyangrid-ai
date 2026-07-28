@@ -591,4 +591,4 @@ def result_card(role: str, title: str, body: str):
 
 def tag_pills(tags):
     html = "".join(f'<span class="gg-pill">{t}</span>' for t in tags)
-    st.html(html)
+    st.html(html)  
