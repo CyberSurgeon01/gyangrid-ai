@@ -13,17 +13,17 @@ import streamlit as st
 
 # ── Light palette ────────────────────────────────────────────────────────
 COLORS = {
-    "bg": "#f7f8fa",
+    "bg": "#f8fafc",
     "surface": "#ffffff",
-    "surface_muted": "#f1f2f5",
-    "border": "#e3e5e9",
-    "text_primary": "#1a1d24",
+    "surface_muted": "#f1f5f9",
+    "border": "#e5e7eb",
+    "text_primary": "#111827",
     "text_secondary": "#6b7280",
     "text_muted": "#9aa0aa",
 
-    "accent": "#2f6fed",
-    "accent_bg": "#eaf1fe",
-    "accent_text": "#1d4fb8",
+    "accent": "#2563eb",
+    "accent_bg": "#eff6ff",
+    "accent_text": "#1d4ed8",
 
     "success": "#1d9e75",
     "success_bg": "#e1f5ee",
@@ -111,6 +111,9 @@ _ICON_PATHS = {
     "list": '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
     "layers": '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
     "grid": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+    "layout-dashboard": '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
+    "file-up": '<path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M4.5 22H18a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v3"/><path d="M12 12v6"/><path d="m9 15 3-3 3 3"/>',
+    "message-question": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9.09 9a3 3 0 1 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
     "sparkles": '<path d="M12 2l1.5 5L19 9l-5.5 2L12 16l-1.5-5L5 9l5.5-2z"/>',
     "quote": '<path d="M4 7c0-2.2 1.8-4 4-4v2c-1.1 0-2 .9-2 2v1h2v4H4V7z"/><path d="M14 7c0-2.2 1.8-4 4-4v2c-1.1 0-2 .9-2 2v1h2v4h-4V7z"/>',
     "download": '<path d="M12 3v12"/><path d="M7 11l5 5 5-5"/><path d="M4 21h16"/>',
@@ -133,6 +136,7 @@ _STROKE_ICONS = {
     "sun", "help", "file-text", "list", "layers", "grid", "download",
     "trash", "eye", "check", "circle", "target", "alert-triangle",
     "help-circle-q", "book", "gauge", "chevron-right", "arrow-right", "inbox",
+    "layout-dashboard", "file-up", "message-question",
 }
 
 
@@ -240,7 +244,7 @@ def _sidebar_nav_icon_css(icon_names: list[str]) -> str:
         rules.append(f"""
         section[data-testid="stSidebar"] div.stButton:nth-of-type({i}) button::before {{
             content: "";
-            width: 18px; height: 18px; flex-shrink: 0;
+            width: 19px; height: 19px; flex-shrink: 0;
             display: inline-block;
             background-color: currentColor;
             -webkit-mask-image: url("{uri}");
@@ -460,32 +464,38 @@ def inject_base_css():
         section[data-testid="stSidebar"] {{
             background: {c['surface']} !important;
             border-right: 1px solid {c['border']};
-            min-width: 260px !important;
+            min-width: 280px !important;
+            max-width: 280px !important;
         }}
         section[data-testid="stSidebar"] * {{
             color: {c['text_primary']} !important;
+        }}
+        section[data-testid="stSidebar"] > div:first-child {{
+            padding: 20px 14px 16px 14px !important;
         }}
 
         .gg-logo {{
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 4px 4px 20px 4px;
+            gap: 11px;
+            padding: 2px 4px 18px 4px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid {c['border']};
         }}
         .gg-logo svg {{ color: {c['accent']} !important; flex-shrink: 0; }}
-        .gg-logo-text {{ display: flex; flex-direction: column; line-height: 1.2; }}
-        .gg-logo-title {{ font-weight: 700; font-size: 17px; color: {c['text_primary']} !important; }}
-        .gg-logo-sub {{ font-size: 12px; color: {c['text_muted']} !important; }}
+        .gg-logo-text {{ display: flex; flex-direction: column; line-height: 1.25; }}
+        .gg-logo-title {{ font-weight: 700; font-size: 19px; letter-spacing: -0.2px; color: {c['text_primary']} !important; }}
+        .gg-logo-sub {{ font-size: 13px; color: {c['text_muted']} !important; }}
 
         .gg-nav-label {{
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.7px;
+            letter-spacing: 0.6px;
             color: {c['text_muted']} !important;
-            padding: 18px 16px 6px 16px;
+            padding: 18px 10px 8px 10px;
         }}
-        .gg-nav-label:first-of-type {{ padding-top: 4px; }}
+        .gg-nav-label:first-of-type {{ padding-top: 2px; }}
 
         .gg-nav-divider {{
             height: 1px;
@@ -499,22 +509,24 @@ def inject_base_css():
         section[data-testid="stSidebar"] div.stButton > button {{
             display: flex !important;
             align-items: center !important;
-            gap: 12px !important;
+            gap: 11px !important;
             justify-content: flex-start !important;
             text-align: left !important;
             border: none !important;
             border-left: 3px solid transparent !important;
             background: transparent !important;
             font-weight: 500 !important;
-            font-size: 14.5px !important;
-            padding: 10px 16px 10px 13px !important;
+            font-size: 15px !important;
+            line-height: 1.3 !important;
+            padding: 9px 14px 9px 11px !important;
+            min-height: 0 !important;
             color: {c['text_secondary']} !important;
-            border-radius: 8px !important;
+            border-radius: 10px !important;
             transition: background 0.12s ease, color 0.12s ease;
         }}
         section[data-testid="stSidebar"] div.stButton > button p {{
             margin: 0 !important;
-            font-size: 14.5px !important;
+            font-size: 15px !important;
         }}
         section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {{
             background: {c['accent_bg']} !important;
@@ -531,29 +543,37 @@ def inject_base_css():
         }}
 
         .gg-sidebar-footer {{
-            margin: 14px 4px 4px 4px;
-            padding: 12px 12px;
+            margin: 16px 2px 2px 2px;
+            padding: 10px 11px;
             border-radius: 10px;
-            background: {c['surface_muted']} !important;
+            background: {c['surface']} !important;
             border: 1px solid {c['border']};
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 9px;
         }}
         .gg-sidebar-footer .gg-avatar {{
-            width: 32px; height: 32px;
-            font-size: 12.5px;
+            width: 30px; height: 30px;
+            font-size: 12px;
             flex-shrink: 0;
         }}
         .gg-sidebar-footer-text {{ display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }}
         .gg-sidebar-footer-name {{
-            font-size: 13.5px; font-weight: 600;
+            font-size: 13px; font-weight: 600;
             color: {c['text_primary']} !important;
             white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }}
         .gg-sidebar-footer-plan {{
-            font-size: 12px;
+            font-size: 11.5px;
             color: {c['text_muted']} !important;
+        }}
+
+        @media (max-width: 640px) {{
+            section[data-testid="stSidebar"] {{
+                min-width: 240px !important;
+                max-width: 82vw !important;
+            }}
         }}
 
         /* Fix applied here to explicitly style background and text colors for secondary buttons */
@@ -844,15 +864,17 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
     active page name."""
     sections = [
         ("Workspace", [
-            ("home", "Dashboard"),
-            ("upload", "Upload paper"),
+            ("layout-dashboard", "Dashboard"),
+            ("file-up", "Upload paper"),
         ]),
         ("AI Tools", [
-            ("message", "Q&A (RAG)"),
+            ("message-question", "Q&A (RAG)"),
             ("sparkles", "AI analysis"),
         ]),
+        ("System", [
+            ("settings", "Settings"),
+        ]),
     ]
-    footer_item = ("settings", "Settings")
 
     if "nav_page" not in st.session_state:
         st.session_state.nav_page = default
@@ -861,12 +883,12 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
 
     # Icons are pinned onto buttons via a positional CSS mask, since
     # st.button() can't render HTML/SVG inside its own label.
-    icon_order = [icon for _, items in sections for icon, _ in items] + [footer_item[0]]
+    icon_order = [icon for _, items in sections for icon, _ in items]
     st.html(f"<style>{_sidebar_nav_icon_css(icon_order)}</style>")
 
     with st.sidebar:
         st.html(
-            f'<div class="gg-logo">{icon_svg("brain", 30, c["accent"])}'
+            f'<div class="gg-logo">{icon_svg("brain", 28, c["accent"])}'
             f'<div class="gg-logo-text">'
             f'<span class="gg-logo-title">GyanGrid AI</span>'
             f'<span class="gg-logo-sub">AI Research Assistant</span>'
@@ -874,7 +896,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
         )
 
         for section_label, items in sections:
-            st.html(f'<div class="gg-nav-label">{section_label}</div>')
+            st.html(f'<div class="gg-nav-label">{section_label.upper()}</div>')
             for icon_name, label in items:
                 is_active = st.session_state.nav_page == label
                 if st.button(
@@ -885,18 +907,6 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
                 ):
                     st.session_state.nav_page = label
                     st.rerun()
-
-        st.html('<div class="gg-nav-divider"></div>')
-        icon_name, label = footer_item
-        is_active = st.session_state.nav_page == label
-        if st.button(
-            label,
-            key=f"nav_{label}",
-            use_container_width=True,
-            type="primary" if is_active else "secondary",
-        ):
-            st.session_state.nav_page = label
-            st.rerun()
 
         st.html(
             '<div class="gg-sidebar-footer">'
