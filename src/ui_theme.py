@@ -51,41 +51,44 @@ COLORS = {
 }
 
 # ── Dark palette ──────────────────────────────────────────────────────
+# Cool slate/indigo scheme (deep navy base, muted indigo accent) rather
+# than a generic charcoal+bright-blue dark mode — reads calmer and more
+# "enterprise software" than "dev tool at midnight".
 DARK_COLORS = {
-    "bg": "#12141a",
-    "surface": "#1b1e26",
-    "surface_muted": "#232733",
-    "border": "#2c3040",
-    "text_primary": "#eef0f4",
-    "text_secondary": "#a8adba",
-    "text_muted": "#6f7585",
+    "bg": "#0a0e17",
+    "surface": "#121826",
+    "surface_muted": "#1a2233",
+    "border": "#242e42",
+    "text_primary": "#e7eaf2",
+    "text_secondary": "#9aa4bb",
+    "text_muted": "#5f6a83",
 
-    "accent": "#5b8def",
-    "accent_bg": "#1d2b46",
-    "accent_text": "#8fb4f7",
+    "accent": "#6c8ef5",
+    "accent_bg": "#1c2748",
+    "accent_text": "#9db2f8",
 
-    "success": "#37c495",
-    "success_bg": "#12332a",
-    "success_text": "#5fe0b8",
+    "success": "#34d399",
+    "success_bg": "#0e2b26",
+    "success_text": "#6ee7c4",
 
-    "warning": "#e0a344",
-    "warning_bg": "#3a2c14",
-    "warning_text": "#f0c479",
+    "warning": "#eab160",
+    "warning_bg": "#33290f",
+    "warning_text": "#f3c98a",
 
-    "pro": "#a79cf2",
-    "pro_bg": "#241f3d",
-    "pro_text": "#c3b8fb",
+    "pro": "#a68cf0",
+    "pro_bg": "#241f42",
+    "pro_text": "#c6b6fa",
 
-    "icon_blue": "#5b8def",
-    "icon_blue_bg": "#1d2b46",
-    "icon_green": "#37c495",
-    "icon_green_bg": "#12332a",
-    "icon_purple": "#a79cf2",
-    "icon_purple_bg": "#241f3d",
-    "icon_orange": "#e0a344",
-    "icon_orange_bg": "#3a2c14",
-    "icon_teal": "#3fb8cc",
-    "icon_teal_bg": "#12303a",
+    "icon_blue": "#6c8ef5",
+    "icon_blue_bg": "#1c2748",
+    "icon_green": "#34d399",
+    "icon_green_bg": "#0e2b26",
+    "icon_purple": "#a68cf0",
+    "icon_purple_bg": "#241f42",
+    "icon_orange": "#eab160",
+    "icon_orange_bg": "#33290f",
+    "icon_teal": "#3fc2d6",
+    "icon_teal_bg": "#0f2e35",
 }
 
 
@@ -165,9 +168,72 @@ def icon_svg(name: str, size: int = 20, color: str = "#1a1d24") -> str:
 TABLER_CDN = ""  # no longer used, kept for backwards compatibility
 
 
+def _icon_mask_data_uri(name: str) -> str:
+    """Base64 SVG (black fill/stroke) used as a CSS mask so a nav icon can
+    sit inside a plain st.button — only the shape's alpha matters, actual
+    color comes from `background-color: currentColor` on the pseudo-el."""
+    path = _ICON_PATHS.get(name, "")
+    if not path:
+        return ""
+    if name in _STROKE_ICONS:
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" '
+            'fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" '
+            f'stroke-linejoin="round">{path}</svg>'
+        )
+    else:
+        svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#000" stroke="none">{path}</svg>'
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{b64}"
+
+
+def _sidebar_nav_icon_css(icon_names: list[str]) -> str:
+    """Builds CSS that pins an icon (as a ::before mask) onto each sidebar
+    nav button, in order. Buttons are matched by position since raw
+    st.button() has no way to embed HTML/SVG inside its label."""
+    rules = []
+    for i, name in enumerate(icon_names, start=1):
+        uri = _icon_mask_data_uri(name)
+        if not uri:
+            continue
+        rules.append(f"""
+        section[data-testid="stSidebar"] div.stButton:nth-of-type({i}) button::before {{
+            content: "";
+            width: 18px; height: 18px; flex-shrink: 0;
+            display: inline-block;
+            background-color: currentColor;
+            -webkit-mask-image: url("{uri}");
+            mask-image: url("{uri}");
+            -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+            -webkit-mask-position: center; mask-position: center;
+            -webkit-mask-size: contain; mask-size: contain;
+        }}
+        """)
+    return "".join(rules)
+
+
 def inject_base_css():
     """Injects the global stylesheet. Call once, near the top of app.py."""
     c = _colors()
+    is_dark = st.session_state.get("dark_mode", False)
+    dark_extra = f"""
+        .gg-card {{
+            box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 10px 28px rgba(0,0,0,0.4);
+        }}
+        .gg-metric, .gg-feature {{
+            box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset;
+        }}
+        section[data-testid="stSidebar"] {{
+            background: linear-gradient(180deg, {c['surface']} 0%, {c['bg']} 100%) !important;
+            box-shadow: 1px 0 0 rgba(255,255,255,0.02) inset;
+        }}
+        [data-testid="stHeader"], .gg-topbar-icon {{
+            background: transparent !important;
+        }}
+        div.stButton > button[kind="primary"] {{
+            box-shadow: 0 4px 14px rgba(108, 142, 245, 0.28);
+        }}
+    """ if is_dark else ""
     css = f"""
         <style>
         html, body, .stApp, [data-testid="stAppViewContainer"] {{
@@ -369,32 +435,82 @@ def inject_base_css():
         .gg-logo-sub {{ font-size: 12px; color: {c['text_muted']} !important; }}
 
         .gg-nav-label {{
-            font-size: 11.5px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.6px;
+            letter-spacing: 0.7px;
             color: {c['text_muted']} !important;
-            padding: 0 16px 8px 16px;
+            padding: 18px 16px 6px 16px;
+        }}
+        .gg-nav-label:first-of-type {{ padding-top: 4px; }}
+
+        .gg-nav-divider {{
+            height: 1px;
+            background: {c['border']};
+            margin: 10px 4px 4px 4px;
         }}
 
+        section[data-testid="stSidebar"] div.stButton {{
+            margin-bottom: 2px !important;
+        }}
         section[data-testid="stSidebar"] div.stButton > button {{
+            display: flex !important;
+            align-items: center !important;
+            gap: 12px !important;
             justify-content: flex-start !important;
             text-align: left !important;
             border: none !important;
+            border-left: 3px solid transparent !important;
             background: transparent !important;
             font-weight: 500 !important;
-            padding: 12px 16px !important;
+            font-size: 14.5px !important;
+            padding: 10px 16px 10px 13px !important;
             color: {c['text_secondary']} !important;
-            border-radius: 9px !important;
-            transition: background 0.12s ease;
+            border-radius: 8px !important;
+            transition: background 0.12s ease, color 0.12s ease;
+        }}
+        section[data-testid="stSidebar"] div.stButton > button p {{
+            margin: 0 !important;
+            font-size: 14.5px !important;
         }}
         section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {{
             background: {c['accent_bg']} !important;
+            border-left: 3px solid {c['accent']} !important;
             color: {c['accent_text']} !important;
             font-weight: 600 !important;
         }}
         section[data-testid="stSidebar"] div.stButton > button:hover {{
             background: {c['surface_muted']} !important;
+            color: {c['text_primary']} !important;
+        }}
+        section[data-testid="stSidebar"] div.stButton > button[kind="primary"]:hover {{
+            color: {c['accent_text']} !important;
+        }}
+
+        .gg-sidebar-footer {{
+            margin: 14px 4px 4px 4px;
+            padding: 12px 12px;
+            border-radius: 10px;
+            background: {c['surface_muted']} !important;
+            border: 1px solid {c['border']};
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
+        .gg-sidebar-footer .gg-avatar {{
+            width: 32px; height: 32px;
+            font-size: 12.5px;
+            flex-shrink: 0;
+        }}
+        .gg-sidebar-footer-text {{ display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }}
+        .gg-sidebar-footer-name {{
+            font-size: 13.5px; font-weight: 600;
+            color: {c['text_primary']} !important;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }}
+        .gg-sidebar-footer-plan {{
+            font-size: 12px;
+            color: {c['text_muted']} !important;
         }}
 
         div.stButton > button, div.stDownloadButton > button {{
@@ -630,6 +746,7 @@ def inject_base_css():
             color: {c['text_muted']} !important;
             font-size: 14px;
         }}
+        {dark_extra}
         </style>
         """
     st.html(textwrap.dedent(css).strip())
@@ -656,19 +773,31 @@ def render_topbar():
 
 
 def render_sidebar_nav(default: str = "Dashboard") -> str:
-    """Renders the logo header + clickable nav list in st.sidebar and
-    returns the currently active page name."""
-    items = [
-        ("home", "Dashboard"),
-        ("upload", "Upload paper"),
-        ("message", "Q&A (RAG)"),
-        ("sparkles", "AI analysis"),
-        ("settings", "Settings"),
+    """Renders the logo header + grouped, clickable nav list in
+    st.sidebar (plus a footer profile card) and returns the currently
+    active page name."""
+    sections = [
+        ("Workspace", [
+            ("home", "Dashboard"),
+            ("upload", "Upload paper"),
+        ]),
+        ("AI Tools", [
+            ("message", "Q&A (RAG)"),
+            ("sparkles", "AI analysis"),
+        ]),
     ]
+    footer_item = ("settings", "Settings")
+
     if "nav_page" not in st.session_state:
         st.session_state.nav_page = default
 
     c = _colors()
+
+    # Icons are pinned onto buttons via a positional CSS mask, since
+    # st.button() can't render HTML/SVG inside its own label.
+    icon_order = [icon for _, items in sections for icon, _ in items] + [footer_item[0]]
+    st.html(f"<style>{_sidebar_nav_icon_css(icon_order)}</style>")
+
     with st.sidebar:
         st.html(
             f'<div class="gg-logo">{icon_svg("brain", 30, c["accent"])}'
@@ -677,17 +806,40 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
             f'<span class="gg-logo-sub">AI Research Assistant</span>'
             f'</div></div>'
         )
-        st.html('<div class="gg-nav-label">Workspace</div>')
-        for icon_name, label in items:
-            is_active = st.session_state.nav_page == label
-            if st.button(
-                label,
-                key=f"nav_{label}",
-                use_container_width=True,
-                type="primary" if is_active else "secondary",
-            ):
-                st.session_state.nav_page = label
-                st.rerun()
+
+        for section_label, items in sections:
+            st.html(f'<div class="gg-nav-label">{section_label}</div>')
+            for icon_name, label in items:
+                is_active = st.session_state.nav_page == label
+                if st.button(
+                    label,
+                    key=f"nav_{label}",
+                    use_container_width=True,
+                    type="primary" if is_active else "secondary",
+                ):
+                    st.session_state.nav_page = label
+                    st.rerun()
+
+        st.html('<div class="gg-nav-divider"></div>')
+        icon_name, label = footer_item
+        is_active = st.session_state.nav_page == label
+        if st.button(
+            label,
+            key=f"nav_{label}",
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+        ):
+            st.session_state.nav_page = label
+            st.rerun()
+
+        st.html(
+            '<div class="gg-sidebar-footer">'
+            '<div class="gg-avatar">RS</div>'
+            '<div class="gg-sidebar-footer-text">'
+            '<span class="gg-sidebar-footer-name">Research Workspace</span>'
+            '<span class="gg-sidebar-footer-plan">Free plan</span>'
+            '</div></div>'
+        )
 
     return st.session_state.nav_page
 
