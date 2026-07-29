@@ -997,3 +997,5 @@ def history_table(rows: list[dict], columns: list[str], empty_message: str = "No
         f'<table class="gg-table"><thead><tr>{header_html}</tr></thead>'
         f'<tbody>{body_html}</tbody></table>'
     )
+
+    
