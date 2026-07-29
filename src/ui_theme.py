@@ -466,20 +466,71 @@ def inject_base_css():
             border-right: 1px solid {c['border']};
             min-width: 280px !important;
             max-width: 280px !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            height: 100vh !important;
+            overflow-y: auto !important;
+            z-index: 100;
+        }}
+        /* Force the sidebar to always stay open/visible. If anything still
+           flips it to aria-expanded="false" (e.g. a keyboard shortcut),
+           this keeps it visually pinned open regardless. */
+        section[data-testid="stSidebar"][aria-expanded="false"] {{
+            min-width: 280px !important;
+            max-width: 280px !important;
+            margin-left: 0 !important;
+            transform: none !important;
+            visibility: visible !important;
         }}
         section[data-testid="stSidebar"] * {{
             color: {c['text_primary']} !important;
         }}
+        /* Hide every control Streamlit provides for collapsing/re-expanding
+           the sidebar — the header's collapse arrow, and the small
+           "re-open" arrow that appears once collapsed. Different testid
+           names are covered since this varies by Streamlit version. */
+        section[data-testid="stSidebar"] button[kind="header"],
+        section[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"],
+        section[data-testid="stSidebar"] [data-testid*="CollapseButton"],
+        [data-testid="collapsedControl"] {{
+            display: none !important;
+        }}
+        /* The sidebar is fixed (out of normal document flow), so the main
+           content area needs its own left offset equal to the sidebar's
+           width, or it would render underneath it. Since collapsing is now
+           disabled, this offset is applied unconditionally. General sibling
+           combinator (~) is used rather than the adjacent one (+) since the
+           main content div isn't always the sidebar's immediate DOM
+           neighbor across Streamlit versions. */
+        section[data-testid="stSidebar"] ~ div {{
+            margin-left: 280px !important;
+        }}
+        /* Streamlit renders several nested wrapper elements inside the
+           sidebar before our own content — a header strip reserved for
+           the collapse control, plus one or more content wrappers that
+           carry large default top padding/margin. Exact testid names
+           differ across Streamlit versions, so instead of guessing one
+           name we neutralize anything whose testid contains "Sidebar",
+           then apply our own top spacing on the outermost wrapper only. */
+        section[data-testid="stSidebar"] [data-testid*="Sidebar"] {{
+            padding-top: 0 !important;
+            margin-top: 0 !important;
+        }}
+        section[data-testid="stSidebar"] div[data-testid="stSidebarHeader"] {{
+            height: 0 !important;
+            min-height: 0 !important;
+        }}
         section[data-testid="stSidebar"] > div:first-child {{
-            padding: 20px 14px 16px 14px !important;
+            padding: 30px 14px 16px 14px !important;
         }}
 
         .gg-logo {{
             display: flex;
             align-items: center;
             gap: 11px;
-            padding: 2px 4px 18px 4px;
-            margin-bottom: 6px;
+            padding: 0 4px 24px 4px;
+            margin-bottom: 0;
             border-bottom: 1px solid {c['border']};
         }}
         .gg-logo svg {{ color: {c['accent']} !important; flex-shrink: 0; }}
@@ -495,7 +546,7 @@ def inject_base_css():
             color: {c['text_muted']} !important;
             padding: 18px 10px 8px 10px;
         }}
-        .gg-nav-label:first-of-type {{ padding-top: 2px; }}
+        .gg-nav-label:first-of-type {{ padding-top: 12px; }}
 
         .gg-nav-divider {{
             height: 1px;
