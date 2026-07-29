@@ -115,12 +115,22 @@ _ICON_PATHS = {
     "trash": '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
     "eye": '<path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>',
     "check": '<polyline points="20 6 9 17 4 12"/>',
+    "circle": '<circle cx="12" cy="12" r="9"/>',
+    "target": '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+    "alert-triangle": '<path d="M12 3l10 18H2z"/><path d="M12 10v4"/><path d="M12 17h.01"/>',
+    "help-circle-q": '<path d="M8 9a4 4 0 1 1 5.5 3.7c-1 .4-1.5 1-1.5 2.3"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="9"/>',
+    "book": '<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v16H6.5A2.5 2.5 0 0 0 4 20.5v-16z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/>',
+    "gauge": '<path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12L18 6"/><path d="M12 2v3"/>',
+    "chevron-right": '<polyline points="9 18 15 12 9 6"/>',
+    "arrow-right": '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+    "inbox": '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
 }
 
 _STROKE_ICONS = {
     "brain", "home", "upload", "message", "bookmark", "clock", "settings",
     "sun", "help", "file-text", "list", "layers", "grid", "download",
-    "trash", "eye", "check",
+    "trash", "eye", "check", "circle", "target", "alert-triangle",
+    "help-circle-q", "book", "gauge", "chevron-right", "arrow-right", "inbox",
 }
 
 
@@ -358,6 +368,15 @@ def inject_base_css():
         .gg-logo-title {{ font-weight: 700; font-size: 17px; color: {c['text_primary']} !important; }}
         .gg-logo-sub {{ font-size: 12px; color: {c['text_muted']} !important; }}
 
+        .gg-nav-label {{
+            font-size: 11.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: {c['text_muted']} !important;
+            padding: 0 16px 8px 16px;
+        }}
+
         section[data-testid="stSidebar"] div.stButton > button {{
             justify-content: flex-start !important;
             text-align: left !important;
@@ -366,6 +385,8 @@ def inject_base_css():
             font-weight: 500 !important;
             padding: 12px 16px !important;
             color: {c['text_secondary']} !important;
+            border-radius: 9px !important;
+            transition: background 0.12s ease;
         }}
         section[data-testid="stSidebar"] div.stButton > button[kind="primary"] {{
             background: {c['accent_bg']} !important;
@@ -473,6 +494,142 @@ def inject_base_css():
             background-color: {c['surface_muted']} !important;
             color: {c['text_primary']} !important;
         }}
+
+        /* ── Header bar (breadcrumb + page title + status) ────────────── */
+        .gg-header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid {c['border']};
+            padding-bottom: 18px;
+            margin-bottom: 22px;
+        }}
+        .gg-crumb {{
+            font-size: 13px;
+            color: {c['text_muted']} !important;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .gg-crumb svg {{ width: 13px; height: 13px; flex-shrink: 0; }}
+        .gg-status-pill {{
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 13.5px;
+            font-weight: 500;
+            padding: 7px 14px;
+            border-radius: 20px;
+            background: {c['surface_muted']} !important;
+            border: 1px solid {c['border']};
+            color: {c['text_secondary']} !important;
+            white-space: nowrap;
+        }}
+        .gg-status-pill.active {{
+            background: {c['success_bg']} !important;
+            color: {c['success_text']} !important;
+            border-color: transparent;
+        }}
+        .gg-status-dot {{
+            width: 7px; height: 7px; border-radius: 50%;
+            background: {c['text_muted']} !important;
+            flex-shrink: 0;
+        }}
+        .gg-status-pill.active .gg-status-dot {{ background: {c['success']} !important; }}
+
+        /* ── Empty state ────────────────────────────────────────────── */
+        .gg-empty {{
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            padding: 56px 24px 48px 24px;
+        }}
+        .gg-empty-icon {{
+            width: 64px; height: 64px;
+            border-radius: 16px;
+            display: flex; align-items: center; justify-content: center;
+            background: {c['accent_bg']} !important;
+            margin-bottom: 20px;
+        }}
+        .gg-empty h3 {{
+            font-size: 20px;
+            font-weight: 600;
+            color: {c['text_primary']} !important;
+            margin: 0 0 8px 0;
+        }}
+        .gg-empty p {{
+            font-size: 15px;
+            color: {c['text_secondary']} !important;
+            max-width: 440px;
+            line-height: 1.55;
+            margin: 0 0 22px 0;
+        }}
+
+        /* ── Feature preview cards (AI analysis capabilities grid) ────── */
+        .gg-feature {{
+            background: {c['surface']} !important;
+            border: 1px solid {c['border']};
+            border-radius: 12px;
+            padding: 20px;
+            height: 100%;
+        }}
+        .gg-feature-icon {{
+            width: 38px; height: 38px;
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 14px;
+        }}
+        .gg-feature h5 {{
+            font-size: 15.5px;
+            font-weight: 600;
+            color: {c['text_primary']} !important;
+            margin: 0 0 6px 0;
+        }}
+        .gg-feature p {{
+            font-size: 13.5px;
+            color: {c['text_secondary']} !important;
+            line-height: 1.5;
+            margin: 0 0 10px 0;
+        }}
+        .gg-feature-badge {{
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            padding: 3px 9px;
+            border-radius: 6px;
+            background: {c['surface_muted']} !important;
+            color: {c['text_muted']} !important;
+        }}
+
+        /* ── Simple table (Recent papers / Analysis history) ──────────── */
+        .gg-table {{ width: 100%; border-collapse: collapse; }}
+        .gg-table th {{
+            text-align: left;
+            font-size: 12.5px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            color: {c['text_muted']} !important;
+            padding: 0 12px 10px 12px;
+            border-bottom: 1px solid {c['border']};
+        }}
+        .gg-table td {{
+            font-size: 14.5px;
+            color: {c['text_primary']} !important;
+            padding: 13px 12px;
+            border-bottom: 1px solid {c['border']};
+        }}
+        .gg-table tr:last-child td {{ border-bottom: none; }}
+        .gg-table-empty {{
+            text-align: center;
+            padding: 32px 12px;
+            color: {c['text_muted']} !important;
+            font-size: 14px;
+        }}
         </style>
         """
     st.html(textwrap.dedent(css).strip())
@@ -520,6 +677,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
             f'<span class="gg-logo-sub">AI Research Assistant</span>'
             f'</div></div>'
         )
+        st.html('<div class="gg-nav-label">Workspace</div>')
         for icon_name, label in items:
             is_active = st.session_state.nav_page == label
             if st.button(
@@ -538,13 +696,15 @@ def card_open(title: str, icon: str, caption: str | None = None, action_html: st
     """Opens a .gg-card div with a heading + optional icon and right-aligned
     action (e.g. a button rendered via action_html). Must be paired with card_close()."""
     icon_html = icon_svg(icon, 20, _colors()["accent"]) if icon else ""
-    st.html(
-        f'<div class="gg-card">'
-        f'<div class="gg-card-header">'
-        f'<div class="gg-card-header-left"><h4>{icon_html}{title}</h4></div>'
-        f'{action_html}'
-        f'</div>'
-    )
+    header_html = ""
+    if title:
+        header_html = (
+            f'<div class="gg-card-header">'
+            f'<div class="gg-card-header-left"><h4>{icon_html}{title}</h4></div>'
+            f'{action_html}'
+            f'</div>'
+        )
+    st.html(f'<div class="gg-card">{header_html}')
     if caption:
         st.html(f'<p class="gg-caption">{caption}</p>')
 
@@ -591,4 +751,97 @@ def result_card(role: str, title: str, body: str):
 
 def tag_pills(tags):
     html = "".join(f'<span class="gg-pill">{t}</span>' for t in tags)
-    st.html(html)  
+    st.html(html)
+
+
+def page_header(title: str, subtitle: str, crumb: list[str] | None = None,
+                 status_label: str | None = None, status_active: bool = False):
+    """Renders a page title block with an optional breadcrumb trail above it
+    and an optional status pill (e.g. paper loaded / not loaded) to the
+    right. Replaces the old raw .gg-title/.gg-subtitle markdown call."""
+    c = _colors()
+    crumb_html = ""
+    if crumb:
+        chevrons = f' {icon_svg("chevron-right", 13, c["text_muted"])} '.join(crumb)
+        crumb_html = f'<div class="gg-crumb">{chevrons}</div>'
+
+    status_html = ""
+    if status_label:
+        active_cls = "active" if status_active else ""
+        status_html = (
+            f'<div class="gg-status-pill {active_cls}">'
+            f'<span class="gg-status-dot"></span>{status_label}</div>'
+        )
+
+    st.html(
+        f'<div class="gg-header">'
+        f'<div>{crumb_html}'
+        f'<div class="gg-title" style="margin-bottom:4px;">{title}</div>'
+        f'<div class="gg-subtitle" style="margin-bottom:0;">{subtitle}</div>'
+        f'</div>'
+        f'<div style="padding-top:4px;">{status_html}</div>'
+        f'</div>'
+    )
+
+
+def empty_state(icon: str, title: str, body: str):
+    """Renders a centered empty-state icon/title/body inside a gg-card.
+    Caller is responsible for card_open()/card_close() around this, or it
+    can be used standalone — button should be rendered by caller right
+    after (Streamlit buttons can't be embedded in raw HTML)."""
+    c = _colors()
+    st.html(
+        f'<div class="gg-empty">'
+        f'<div class="gg-empty-icon">{icon_svg(icon, 30, c["accent"])}</div>'
+        f'<h3>{title}</h3>'
+        f'<p>{body}</p>'
+        f'</div>'
+    )
+
+
+def feature_preview_card(icon: str, title: str, body: str, badge: str = "Coming soon", color: str = "accent"):
+    """Renders a small preview card describing an upcoming analysis
+    capability (e.g. 'Paper Summary', 'Key Topics')."""
+    c_all = _colors()
+    color_map = {
+        "accent": ("icon_blue", "icon_blue_bg"),
+        "success": ("icon_green", "icon_green_bg"),
+        "pro": ("icon_purple", "icon_purple_bg"),
+        "warning": ("icon_orange", "icon_orange_bg"),
+        "teal": ("icon_teal", "icon_teal_bg"),
+    }
+    fg_key, bg_key = color_map.get(color, color_map["accent"])
+    fg, bg = c_all[fg_key], c_all[bg_key]
+    st.html(
+        f'<div class="gg-feature">'
+        f'<div class="gg-feature-icon" style="background:{bg};color:{fg};">'
+        f'{icon_svg(icon, 19, fg)}</div>'
+        f'<h5>{title}</h5>'
+        f'<p>{body}</p>'
+        f'<span class="gg-feature-badge">{badge}</span>'
+        f'</div>'
+    )
+
+
+def history_table(rows: list[dict], columns: list[str], empty_message: str = "No analyses yet."):
+    """Renders a lightweight HTML table for 'Recent papers' / 'Analysis
+    history'. rows is a list of dicts keyed by column name; if rows is
+    empty, shows a centered placeholder row instead."""
+    if not rows:
+        st.html(
+            f'<table class="gg-table"><thead><tr>'
+            + "".join(f"<th>{col}</th>" for col in columns)
+            + f'</tr></thead></table>'
+            f'<div class="gg-table-empty">{empty_message}</div>'
+        )
+        return
+
+    header_html = "".join(f"<th>{col}</th>" for col in columns)
+    body_html = ""
+    for row in rows:
+        cells = "".join(f"<td>{row.get(col, '')}</td>" for col in columns)
+        body_html += f"<tr>{cells}</tr>"
+    st.html(
+        f'<table class="gg-table"><thead><tr>{header_html}</tr></thead>'
+        f'<tbody>{body_html}</tbody></table>'
+    )

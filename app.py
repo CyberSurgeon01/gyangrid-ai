@@ -18,6 +18,10 @@ from src.ui_theme import (
     structure_row,
     result_card,
     tag_pills,
+    page_header,
+    empty_state,
+    feature_preview_card,
+    history_table,
 )
 
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
@@ -25,10 +29,24 @@ inject_base_css()
 page = render_sidebar_nav(default="Dashboard")
 render_topbar()
 
-st.markdown(
-    '<div class="gg-title">GyanGrid AI</div>'
-    '<div class="gg-subtitle">Upload a research paper and prepare it for AI analysis.</div>',
-    unsafe_allow_html=True,
+_HAS_PAPER = "processed_file_name" in st.session_state
+_PAGE_COPY = {
+    "Dashboard": ("Dashboard", "Overview of your uploaded paper's structure and extracted content."),
+    "Upload paper": ("Upload paper", "Upload a research paper and prepare it for AI analysis."),
+    "Q&A (RAG)": ("Q&A (RAG)", "Ask grounded questions and get answers sourced directly from the paper."),
+    "AI analysis": ("AI Analysis", "Upload a research paper to generate summaries, insights, questions, and citation support."),
+    "Settings": ("Settings", "Configure output language and workspace preferences."),
+}
+_title, _subtitle = _PAGE_COPY.get(page, ("GyanGrid AI", ""))
+page_header(
+    _title,
+    _subtitle,
+    crumb=["GyanGrid AI", page],
+    status_label=(
+        f"Paper loaded: {st.session_state.get('processed_file_name', '')[:28]}"
+        if _HAS_PAPER else "No paper loaded"
+    ),
+    status_active=_HAS_PAPER,
 )
 
 
@@ -180,7 +198,73 @@ if page == "Q&A (RAG)":
 
 # ── AI analysis page ─────────────────────────────────────────────────────
 if page == "AI analysis":
-    if require_document():
+    if "processed_file_name" not in st.session_state:
+        card_open("", "")
+        empty_state(
+            "sparkles",
+            "No paper loaded yet",
+            "Upload a research paper to generate an AI-powered summary, "
+            "key topics, research gaps, likely reviewer questions, and "
+            "citation support — all grounded in the paper's own text.",
+        )
+        _, btn_col, _ = st.columns([1, 1, 1])
+        with btn_col:
+            if st.button("Upload paper", type="primary", use_container_width=True, key="ai_empty_upload_btn"):
+                st.session_state.nav_page = "Upload paper"
+                st.rerun()
+        card_close()
+
+        card_open("What you'll get", "grid", caption="These panels populate automatically once a paper is processed.")
+        f1, f2, f3 = st.columns(3)
+        with f1:
+            feature_preview_card(
+                "file-text", "Paper Summary",
+                "A concise, plain-language digest of the paper's core contribution.",
+                color="accent",
+            )
+        with f2:
+            feature_preview_card(
+                "layers", "Key Topics",
+                "The main themes and technical concepts the paper covers.",
+                color="pro",
+            )
+        with f3:
+            feature_preview_card(
+                "alert-triangle", "Research Gaps",
+                "Limitations and open problems the authors call out or imply.",
+                color="warning",
+            )
+        st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
+        f4, f5, f6 = st.columns(3)
+        with f4:
+            feature_preview_card(
+                "help-circle-q", "Generated Questions",
+                "Likely reviewer or exam questions drawn from the paper's content.",
+                color="teal",
+            )
+        with f5:
+            feature_preview_card(
+                "quote", "Citation Support",
+                "Verified in-text citations cross-checked against source references.",
+                color="success",
+            )
+        with f6:
+            feature_preview_card(
+                "gauge", "AI Readiness Score",
+                "How well-structured the paper is for automated analysis.",
+                color="accent",
+            )
+        card_close()
+
+        card_open("Analysis history", "clock", caption="Papers you've previously run through AI analysis.")
+        history_table(
+            rows=[],
+            columns=["Paper", "Date", "Status", "Novelty score"],
+            empty_message="No analyses yet — your processed papers will appear here.",
+        )
+        card_close()
+
+    else:
         parsed = st.session_state.parsed
         store = st.session_state.vector_store
         lang_code = st.session_state.get("lang_code", "en")
