@@ -11,7 +11,7 @@ import base64
 import textwrap
 import streamlit as st
 
-# ── Design tokens ────────────────────────────────────────────────────────
+# ── Light palette ────────────────────────────────────────────────────────
 COLORS = {
     "bg": "#f7f8fa",
     "surface": "#ffffff",
@@ -51,44 +51,42 @@ COLORS = {
 }
 
 # ── Dark palette ──────────────────────────────────────────────────────
-# Cool slate/indigo scheme (deep navy base, muted indigo accent) rather
-# than a generic charcoal+bright-blue dark mode — reads calmer and more
-# "enterprise software" than "dev tool at midnight".
+# Premium research-focused dark mode (deep navy base, electric blue, teal accent).
 DARK_COLORS = {
-    "bg": "#0a0e17",
-    "surface": "#121826",
-    "surface_muted": "#1a2233",
-    "border": "#242e42",
-    "text_primary": "#e7eaf2",
-    "text_secondary": "#9aa4bb",
-    "text_muted": "#5f6a83",
+    "bg": "#0B0F14",
+    "surface": "#121A23",
+    "surface_muted": "#17212B",
+    "border": "#243244",
+    "text_primary": "#F8FAFC",
+    "text_secondary": "#CBD5E1",
+    "text_muted": "#94A3B8",
 
-    "accent": "#6c8ef5",
-    "accent_bg": "#1c2748",
-    "accent_text": "#9db2f8",
+    "accent": "#3B82F6",
+    "accent_bg": "rgba(59, 130, 246, 0.14)",
+    "accent_text": "#3B82F6",
 
-    "success": "#34d399",
-    "success_bg": "#0e2b26",
-    "success_text": "#6ee7c4",
+    "success": "#22C55E",
+    "success_bg": "rgba(34, 197, 94, 0.14)",
+    "success_text": "#22C55E",
 
-    "warning": "#eab160",
-    "warning_bg": "#33290f",
-    "warning_text": "#f3c98a",
+    "warning": "#F59E0B",
+    "warning_bg": "rgba(245, 158, 11, 0.14)",
+    "warning_text": "#F59E0B",
 
-    "pro": "#a68cf0",
-    "pro_bg": "#241f42",
-    "pro_text": "#c6b6fa",
+    "pro": "#14B8A6",
+    "pro_bg": "rgba(20, 184, 166, 0.14)",
+    "pro_text": "#14B8A6",
 
-    "icon_blue": "#6c8ef5",
-    "icon_blue_bg": "#1c2748",
-    "icon_green": "#34d399",
-    "icon_green_bg": "#0e2b26",
-    "icon_purple": "#a68cf0",
-    "icon_purple_bg": "#241f42",
-    "icon_orange": "#eab160",
-    "icon_orange_bg": "#33290f",
-    "icon_teal": "#3fc2d6",
-    "icon_teal_bg": "#0f2e35",
+    "icon_blue": "#3B82F6",
+    "icon_blue_bg": "rgba(59, 130, 246, 0.14)",
+    "icon_green": "#22C55E",
+    "icon_green_bg": "rgba(34, 197, 94, 0.14)",
+    "icon_purple": "#14B8A6",
+    "icon_purple_bg": "rgba(20, 184, 166, 0.14)",
+    "icon_orange": "#F59E0B",
+    "icon_orange_bg": "rgba(245, 158, 11, 0.14)",
+    "icon_teal": "#14B8A6",
+    "icon_teal_bg": "rgba(20, 184, 166, 0.14)",
 }
 
 
@@ -107,6 +105,7 @@ _ICON_PATHS = {
     "clock": '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
     "settings": '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     "sun": '<circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
+    "moon": '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
     "help": '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7"/><path d="M12 17h.01"/>',
     "file-text": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h8"/>',
     "list": '<path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/>',
@@ -187,6 +186,48 @@ def _icon_mask_data_uri(name: str) -> str:
     return f"data:image/svg+xml;base64,{b64}"
 
 
+def _theme_toggle_track_icon_uri(name: str, color: str) -> str:
+    """A small bare icon (no knob/background) sized for the exposed half of
+    the dark-mode toggle switch track."""
+    path = _ICON_PATHS.get(name, "")
+    if not path:
+        return ""
+    if name in _STROKE_ICONS:
+        icon = (
+            f'<svg x="4" y="4" width="16" height="16" viewBox="0 0 24 24" fill="none" '
+            f'stroke="{color}" stroke-width="2.2" stroke-linecap="round" '
+            f'stroke-linejoin="round">{path}</svg>'
+        )
+    else:
+        icon = f'<svg x="4" y="4" width="16" height="16" viewBox="0 0 24 24" fill="{color}" stroke="none">{path}</svg>'
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">{icon}</svg>'
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{b64}"
+
+
+def _theme_toggle_knob_uri(name: str, icon_color: str, knob_bg: str) -> str:
+    """A rounded-square knob (matching the reference switch design) with the
+    given icon centered inside it, as a single SVG data-URI."""
+    path = _ICON_PATHS.get(name, "")
+    if not path:
+        return ""
+    if name in _STROKE_ICONS:
+        icon = (
+            f'<svg x="6" y="6" width="20" height="20" viewBox="0 0 24 24" fill="none" '
+            f'stroke="{icon_color}" stroke-width="2.2" stroke-linecap="round" '
+            f'stroke-linejoin="round">{path}</svg>'
+        )
+    else:
+        icon = f'<svg x="6" y="6" width="20" height="20" viewBox="0 0 24 24" fill="{icon_color}" stroke="none">{path}</svg>'
+    svg = (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">'
+        f'<rect x="1" y="1" width="30" height="30" rx="9" fill="{knob_bg}"/>'
+        f'{icon}</svg>'
+    )
+    b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
+    return f"data:image/svg+xml;base64,{b64}"
+
+
 def _sidebar_nav_icon_css(icon_names: list[str]) -> str:
     """Builds CSS that pins an icon (as a ::before mask) onto each sidebar
     nav button, in order. Buttons are matched by position since raw
@@ -216,6 +257,7 @@ def inject_base_css():
     """Injects the global stylesheet. Call once, near the top of app.py."""
     c = _colors()
     is_dark = st.session_state.get("dark_mode", False)
+    
     dark_extra = f"""
         .gg-card {{
             box-shadow: 0 1px 0 rgba(255,255,255,0.03) inset, 0 10px 28px rgba(0,0,0,0.4);
@@ -234,6 +276,7 @@ def inject_base_css():
             box-shadow: 0 4px 14px rgba(108, 142, 245, 0.28);
         }}
     """ if is_dark else ""
+    
     css = f"""
         <style>
         html, body, .stApp, [data-testid="stAppViewContainer"] {{
@@ -513,9 +556,12 @@ def inject_base_css():
             color: {c['text_muted']} !important;
         }}
 
-        div.stButton > button, div.stDownloadButton > button {{
+        /* Fix applied here to explicitly style background and text colors for secondary buttons */
+        div.stButton > button, div.stDownloadButton > button, [data-testid="stFileUploaderDropzone"] button {{
             border-radius: 10px;
-            border: 1px solid {c['border']};
+            border: 1px solid {c['border']} !important;
+            background-color: {c['surface']} !important;
+            color: {c['text_primary']} !important;
             font-size: 16px;
             font-weight: 500;
             padding: 12px 22px;
@@ -523,7 +569,7 @@ def inject_base_css():
             min-height: 48px;
         }}
         div.stButton > button[kind="primary"] {{
-            background: {c['accent']} !important;
+            background-color: {c['accent']} !important;
             border-color: {c['accent']} !important;
             color: #ffffff !important;
         }}
@@ -548,6 +594,9 @@ def inject_base_css():
             font-size: 16px !important;
             padding: 12px 24px !important;
             min-height: 48px !important;
+            background-color: {c['surface']} !important;
+            color: {c['text_primary']} !important;
+            border: 1px solid {c['border']} !important;
         }}
         [data-testid="stFileUploaderDropzoneInstructions"] span {{
             font-size: 16px !important;
@@ -753,19 +802,36 @@ def inject_base_css():
 
 
 def render_topbar():
-    """Renders the top-right icon row: a working dark-mode toggle, a
-    decorative help icon, and an avatar."""
+    """Renders the top-right icon row: a working dark-mode toggle (Streamlit's
+    native st.toggle widget), a decorative help icon, and an avatar."""
     if "dark_mode" not in st.session_state:
         st.session_state.dark_mode = False
     c = _colors()
+    is_dark = st.session_state.dark_mode
+    tooltip = (
+        "Currently dark mode — click for light"
+        if is_dark else
+        "Currently light mode — click for dark"
+    )
 
-    spacer, toggle_col, help_col, avatar_col = st.columns([14, 1, 1, 1])
+    # Minimal styling only (colors/sizing) — no background-image overlay,
+    # no hidden-label tricks, no custom click handling. This is a plain
+    # native Streamlit widget, so clicks are guaranteed to register.
+    st.html(f"""
+        <style>
+        .st-key-dark_mode_toggle label {{
+            font-size: 20px !important;
+        }}
+        </style>
+    """)
+
+    spacer, toggle_col, help_col, avatar_col = st.columns([12, 2, 1, 1])
     with toggle_col:
-        label = "🌙" if not st.session_state.dark_mode else "☀️"
-        tooltip = "Currently light mode — click for dark" if not st.session_state.dark_mode else "Currently dark mode — click for light"
-        if st.button(label, key="theme_toggle_btn", help=tooltip):
-            st.session_state.dark_mode = not st.session_state.dark_mode
-            st.rerun()
+        st.toggle(
+            "🌙" if is_dark else "☀️",
+            key="dark_mode",
+            help=tooltip,
+        )
     with help_col:
         st.html(f'<div class="gg-topbar-icon">{icon_svg("help", 18, c["text_secondary"])}</div>')
     with avatar_col:
@@ -997,5 +1063,3 @@ def history_table(rows: list[dict], columns: list[str], empty_message: str = "No
         f'<table class="gg-table"><thead><tr>{header_html}</tr></thead>'
         f'<tbody>{body_html}</tbody></table>'
     )
-
-    
