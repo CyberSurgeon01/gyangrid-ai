@@ -1,6 +1,6 @@
 from src.llm_pipeline import analyze_paper, answer_question, _expand_query
 from src.report_export import generate_docx_report, generate_pdf_report
-from src.citation_graph import build_citation_graph, most_cited_references
+from src.citation_graph import build_citation_graph, most_cited_references, reference_year_distribution
 import streamlit as st
 from src.document_loader import load_document
 from src.text_cleaner import clean_text
@@ -474,6 +474,28 @@ if page == "Citation graph":
                 top_refs = most_cited_references(graph, top_n=10)
                 for ref in top_refs:
                     st.write(f"- {ref['label']} — cited {ref['times_cited']}x")
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            card_open(
+                "Reference publication years",
+                "calendar",
+                caption="How recent the literature this paper cites actually is.",
+            )
+            year_dist = reference_year_distribution(graph)
+            if year_dist:
+                import pandas as pd
+
+                year_df = pd.DataFrame(
+                    {"Year": list(year_dist.keys()), "References": list(year_dist.values())}
+                ).set_index("Year")
+                st.bar_chart(year_df, color="#378ADD")
+                if "unknown" in year_dist:
+                    st.caption(
+                        f"{year_dist['unknown']} reference(s) had no detectable publication year."
+                    )
+            else:
+                st.caption("No reference years could be detected.")
+            card_close()
 
 # ── Settings page ────────────────────────────────────────────────────────
 if page == "Settings":

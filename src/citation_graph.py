@@ -327,6 +327,7 @@ def build_citation_graph(
                 "type": "reference",
                 "section": None,
                 "times_cited": total,
+                "year": ref.get("year"),
             }
         )
 
@@ -392,6 +393,25 @@ def graph_to_vis_json(graph: Dict[str, Any]) -> Dict[str, Any]:
         "paperTitle": graph["paper_title"],
         "warnings": graph["warnings"],
     }
+
+
+def reference_year_distribution(graph: Dict[str, Any]) -> Dict[str, int]:
+    """Returns a {year_string: count} dict of how many references were
+    published in each year, sorted by year ascending. References with no
+    detectable year are grouped under 'unknown'. Useful for a timeline
+    chart showing how recent the paper's literature base is."""
+    counts: Dict[str, int] = defaultdict(int)
+    for n in graph["nodes"]:
+        if n["type"] != "reference":
+            continue
+        year = n.get("year") or "unknown"
+        counts[year] += 1
+
+    def _sort_key(item):
+        y = item[0]
+        return (0, int(y)) if y.isdigit() else (1, y)
+
+    return dict(sorted(counts.items(), key=_sort_key))
 
 
 def most_cited_references(graph: Dict[str, Any], top_n: int = 5) -> List[Dict[str, Any]]:
