@@ -315,19 +315,19 @@ if page == "AI analysis":
             feature_preview_card(
                 "file-text", "Paper Summary",
                 "A concise, plain-language digest of the paper's core contribution.",
-                color="accent",
+                color="accent", badge="Supported",
             )
         with f2:
             feature_preview_card(
                 "layers", "Key Topics",
                 "The main themes and technical concepts the paper covers.",
-                color="pro",
+                color="pro", badge="Supported",
             )
         with f3:
             feature_preview_card(
                 "alert-triangle", "Research Gaps",
                 "Limitations and open problems the authors call out or imply.",
-                color="warning",
+                color="warning", badge="Supported",
             )
         st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
         f4, f5, f6 = st.columns(3)
@@ -335,7 +335,7 @@ if page == "AI analysis":
             feature_preview_card(
                 "help-circle-q", "Generated Questions",
                 "Likely reviewer or exam questions drawn from the paper's content.",
-                color="teal",
+                color="teal", badge="Supported",
             )
         with f5:
             feature_preview_card(

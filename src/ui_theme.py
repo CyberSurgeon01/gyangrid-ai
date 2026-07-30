@@ -852,6 +852,10 @@ def inject_base_css():
             background: {c['surface_muted']} !important;
             color: {c['text_muted']} !important;
         }}
+        .gg-feature-badge-supported {{
+            background: {c['icon_green_bg']} !important;
+            color: {c['icon_green']} !important;
+        }}
 
         /* ── Simple table (Recent papers / Analysis history) ──────────── */
         .gg-table {{ width: 100%; border-collapse: collapse; }}
@@ -1120,13 +1124,16 @@ def feature_preview_card(icon: str, title: str, body: str, badge: str = "Coming 
     }
     fg_key, bg_key = color_map.get(color, color_map["accent"])
     fg, bg = c_all[fg_key], c_all[bg_key]
+    badge_class = "gg-feature-badge"
+    if badge.strip().lower() == "supported":
+        badge_class += " gg-feature-badge-supported"
     st.html(
         f'<div class="gg-feature">'
         f'<div class="gg-feature-icon" style="background:{bg};color:{fg};">'
         f'{icon_svg(icon, 19, fg)}</div>'
         f'<h5>{title}</h5>'
         f'<p>{body}</p>'
-        f'<span class="gg-feature-badge">{badge}</span>'
+        f'<span class="{badge_class}">{badge}</span>'
         f'</div>'
     )
 
