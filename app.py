@@ -14,6 +14,7 @@ from src.audio_player import render_audio_player
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
+    render_dark_mode_toggle,
     card_open,
     card_close,
     metric_tile,
@@ -27,6 +28,15 @@ from src.ui_theme import (
 )
 
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
+
+# ── Restore dark-mode preference after a page refresh ───────────────────
+# st.session_state resets on refresh (new browser session), but
+# st.query_params survives it — same trick used below for the loaded
+# paper. Without this, the toggle "wins" only within the current
+# session and silently falls back to light on the next refresh.
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = st.query_params.get("theme") == "dark"
+
 inject_base_css()
 page = render_sidebar_nav(default="Dashboard")
 
@@ -590,6 +600,8 @@ if page == "Citation graph":
 
 # ── Settings page ────────────────────────────────────────────────────────
 if page == "Settings":
+    render_dark_mode_toggle()
+
     card_open("Output language", "settings")
     st.caption("Applies to Q&A answers and the full AI analysis.")
     lang_choice = st.radio(
