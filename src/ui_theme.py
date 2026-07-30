@@ -956,6 +956,50 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
     return st.session_state.nav_page
 
 
+def render_dark_mode_toggle():
+    """Renders a working 'Appearance' card for the Settings page with a
+    dark/light mode toggle.
+
+    st.session_state['dark_mode'] is a PLAIN flag, not a widget key. This
+    matters: a key that belongs to a widget (e.g. st.toggle(key=...)) is
+    only kept alive by Streamlit while that widget is actually rendered
+    on the current page — navigate to a page that doesn't render it and
+    Streamlit resets it to default. That was the bug: binding "dark_mode"
+    directly to the toggle's own key made it revert to light on every
+    page except Settings. The toggle now uses its own separate widget key
+    ("dark_mode_widget") and this function copies its value into the
+    plain "dark_mode" flag, which persists across pages exactly like any
+    other ordinary session_state variable.
+
+    The choice is also mirrored into st.query_params (?theme=dark|light)
+    so it survives a full browser refresh and applies on every page, not
+    just this one — session_state alone resets on refresh, same as the
+    loaded-paper restore logic elsewhere in app.py. app.py is expected to
+    read that query param back into session_state near the top of the
+    script, before inject_base_css() runs.
+
+    IMPORTANT — for this to actually take effect, app.py must call
+    inject_base_css() unconditionally on every rerun (near the top of
+    the script), the same way it already does for the light theme.
+    If inject_base_css() is wrapped in @st.cache_resource / @st.cache_data,
+    it will keep returning the FIRST theme it ever computed and dark mode
+    will silently never apply — that decorator (if present) must be
+    removed from that function.
+    """
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = st.query_params.get("theme") == "dark"
+
+    icon = "moon" if st.session_state.dark_mode else "sun"
+    card_open("Appearance", icon, caption="Switch between light and dark mode.")
+    is_dark = st.toggle("Dark mode", value=st.session_state.dark_mode, key="dark_mode_widget")
+    card_close()
+
+    if is_dark != st.session_state.dark_mode:
+        st.session_state.dark_mode = is_dark
+        st.query_params["theme"] = "dark" if is_dark else "light"
+        st.rerun()
+
+
 def card_open(title: str, icon: str, caption: str | None = None, action_html: str = ""):
     """Opens a .gg-card div with a heading + optional icon and right-aligned
     action (e.g. a button rendered via action_html). Must be paired with card_close()."""
