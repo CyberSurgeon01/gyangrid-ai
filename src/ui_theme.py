@@ -873,38 +873,8 @@ def inject_base_css():
 
 
 def render_topbar():
-    """Renders the top-right icon row: a working dark-mode toggle (Streamlit's
-    native st.toggle widget), a decorative help icon, and an avatar."""
-    if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = False
-    c = _colors()
-    is_dark = st.session_state.dark_mode
-    tooltip = (
-        "Currently dark mode — click for light"
-        if is_dark else
-        "Currently light mode — click for dark"
-    )
-
-    # Minimal styling only (colors/sizing) — no background-image overlay,
-    # no hidden-label tricks, no custom click handling. This is a plain
-    # native Streamlit widget, so clicks are guaranteed to register.
-    st.html(f"""
-        <style>
-        .st-key-dark_mode_toggle label {{
-            font-size: 20px !important;
-        }}
-        </style>
-    """)
-
-    spacer, toggle_col, help_col, avatar_col = st.columns([12, 2, 1, 1])
-    with toggle_col:
-        st.toggle(
-            "🌙" if is_dark else "☀️",
-            key="dark_mode",
-            help=tooltip,
-        )
-    with help_col:
-        st.html(f'<div class="gg-topbar-icon">{icon_svg("help", 18, c["text_secondary"])}</div>')
+    """Renders the top-right icon row: avatar only."""
+    spacer, avatar_col = st.columns([15, 1])
     with avatar_col:
         st.html('<div class="gg-avatar">RS</div>')
 
