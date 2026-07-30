@@ -1,5 +1,6 @@
 from src.llm_pipeline import analyze_paper, answer_question, _expand_query
 from src.report_export import generate_docx_report, generate_pdf_report
+from src.citation_graph import build_citation_graph, most_cited_references
 import streamlit as st
 from src.document_loader import load_document
 from src.text_cleaner import clean_text
@@ -10,7 +11,6 @@ from src.vector_store import VectorStore
 from src.audio_player import render_audio_player
 from src.ui_theme import (
     inject_base_css,
-    render_topbar,
     render_sidebar_nav,
     card_open,
     card_close,
@@ -27,7 +27,6 @@ from src.ui_theme import (
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
 inject_base_css()
 page = render_sidebar_nav(default="Dashboard")
-render_topbar()
 
 _HAS_PAPER = "processed_file_name" in st.session_state
 _PAGE_COPY = {
@@ -35,6 +34,7 @@ _PAGE_COPY = {
     "Upload paper": ("Upload paper", "Upload a research paper and prepare it for AI analysis."),
     "Q&A (RAG)": ("Q&A (RAG)", "Ask grounded questions and get answers sourced directly from the paper."),
     "AI analysis": ("AI Analysis", "Upload a research paper to generate summaries, insights, questions, and citation support."),
+    "Citation graph": ("Citation graph", "Visualize how this paper's citations map to its reference list."),
     "Settings": ("Settings", "Configure output language and workspace preferences."),
 }
 _title, _subtitle = _PAGE_COPY.get(page, ("GyanGrid AI", ""))
@@ -376,6 +376,104 @@ if page == "AI analysis":
                     use_container_width=True,
                 )
             card_close()
+
+# ── Citation graph page ─────────────────────────────────────────────────
+if page == "Citation graph":
+    if require_document():
+        parsed = st.session_state.parsed
+
+        graph = build_citation_graph(parsed)
+        for w in graph["warnings"]:
+            st.warning(w)
+
+        if len(graph["nodes"]) <= 1:
+            st.info("No citations could be matched in this paper yet.")
+        else:
+            try:
+                from streamlit_agraph import agraph, Node, Edge, Config
+
+                section_colors = {}
+                palette = ["#6C8EF5", "#1D9E75", "#D85A30", "#D4537E", "#BA7517", "#7F77DD"]
+
+                def _color_for_section(section_name):
+                    if section_name not in section_colors:
+                        section_colors[section_name] = palette[len(section_colors) % len(palette)]
+                    return section_colors[section_name]
+
+                def _truncate_label(label, max_chars=18):
+                    return label if len(label) <= max_chars else label[: max_chars - 1] + "…"
+
+                agraph_nodes = []
+                for n in graph["nodes"]:
+                    if n["type"] == "paper":
+                        agraph_nodes.append(
+                            Node(
+                                id=n["id"],
+                                label=_truncate_label(n["label"], max_chars=20),
+                                title=n["label"],
+                                size=30,
+                                color="#2C2C2A",
+                                shape="dot",
+                                font={"size": 14, "color": "#ffffff", "strokeWidth": 0},
+                            )
+                        )
+                    else:
+                        weight = n["times_cited"] or 0
+                        agraph_nodes.append(
+                            Node(
+                                id=n["id"],
+                                label=_truncate_label(n["label"]),
+                                title=f"{n['label']} — cited {weight}x",
+                                size=10 + min(weight, 6) * 2,
+                                color="#378ADD",
+                                shape="dot",
+                                font={"size": 11, "color": "#1a1d24", "strokeWidth": 3, "strokeColor": "#ffffff"},
+                            )
+                        )
+
+                agraph_edges = [
+                    Edge(
+                        source=e["source"],
+                        target=e["target"],
+                        color=_color_for_section(e["section"]),
+                    )
+                    for e in graph["edges"]
+                    if e["weight"] > 0
+                ]
+
+                num_ref_nodes = max(len(agraph_nodes) - 1, 1)
+                canvas_height = min(900, max(560, 60 + num_ref_nodes * 34))
+
+                config = Config(
+                    width="100%",
+                    height=canvas_height,
+                    directed=True,
+                    physics=True,
+                    hierarchical=False,
+                    collapsible=False,
+                    nodeHighlightBehavior=True,
+                    highlightColor="#F2A623",
+                    node={"labelProperty": "label"},
+                    link={"renderLabel": False},
+                    d3={"gravity": -600, "linkLength": 180, "linkStrength": 0.4},
+                )
+                agraph(nodes=agraph_nodes, edges=agraph_edges, config=config)
+                st.caption("Hover a node to see its full title. Drag nodes to spread them out further.")
+
+                if section_colors:
+                    st.caption(
+                        "Edge colors by section: "
+                        + ", ".join(f"{sec}" for sec in section_colors.keys())
+                    )
+            except ImportError:
+                st.warning(
+                    "The interactive graph view needs the `streamlit-agraph` package "
+                    "(add it to requirements.txt: `streamlit-agraph`). Showing a plain "
+                    "ranked list instead."
+                )
+                top_refs = most_cited_references(graph, top_n=10)
+                for ref in top_refs:
+                    st.write(f"- {ref['label']} — cited {ref['times_cited']}x")
 
 # ── Settings page ────────────────────────────────────────────────────────
 if page == "Settings":

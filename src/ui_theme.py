@@ -891,6 +891,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
         ("AI Tools", [
             ("message-question", "Q&A (RAG)"),
             ("sparkles", "AI analysis"),
+            ("quote", "Citation graph"),
         ]),
         ("System", [
             ("settings", "Settings"),
@@ -909,7 +910,8 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
 
     with st.sidebar:
         st.html(
-            f'<div class="gg-logo">{icon_svg("brain", 28, c["accent"])}'
+            f'<div class="gg-logo" style="pointer-events:none;">'
+            f'{icon_svg("brain", 28, c["accent"])}'
             f'<div class="gg-logo-text">'
             f'<span class="gg-logo-title">GyanGrid AI</span>'
             f'<span class="gg-logo-sub">AI Research Assistant</span>'

@@ -10,3 +10,4 @@ google-generativeai
 reportlab
 reportlab
 reportlab
+streamlit-agraph
