@@ -8,6 +8,7 @@ from src.chunker import chunk_text, chunk_sections
 from src.parser import parse_document
 from src.embeddings import embed_chunks, embed_query
 from src.vector_store import VectorStore
+from src.paper_cache import hash_file_bytes, save_paper, load_paper, save_analysis, load_analysis
 from src.audio_player import render_audio_player
 from src.ui_theme import (
     inject_base_css,
@@ -27,6 +28,26 @@ from src.ui_theme import (
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
 inject_base_css()
 page = render_sidebar_nav(default="Dashboard")
+
+# ── Restore a previously-processed paper after a page refresh ───────────
+# st.session_state resets on refresh (new browser session), but
+# st.query_params survives it — so a hash in the URL is what lets us find
+# the cached pipeline output (and, if present, the AI analysis) on disk.
+if "processed_file_name" not in st.session_state and "paper" in st.query_params:
+    _cached = load_paper(st.query_params["paper"])
+    if _cached:
+        _data, _store = _cached
+        st.session_state.processed_file_name = _data["file_name"]
+        st.session_state.cleaned_text = _data["cleaned_text"]
+        st.session_state.chunks = _data["chunks"]
+        st.session_state.parsed = _data["parsed"]
+        st.session_state.section_chunks = _data["section_chunks"]
+        st.session_state.vector_store = _store
+
+        _cached_analysis = load_analysis(st.query_params["paper"])
+        if _cached_analysis:
+            st.session_state.last_analysis = _cached_analysis["analysis"]
+            st.session_state.last_analysis_lang = _cached_analysis["lang_code"]
 
 _HAS_PAPER = "processed_file_name" in st.session_state
 _PAGE_COPY = {
@@ -51,9 +72,36 @@ page_header(
 
 
 def process_uploaded_file(uploaded_file):
-    """Runs the load -> clean -> parse -> chunk -> embed pipeline once per new file."""
+    """Runs the load -> clean -> parse -> chunk -> embed pipeline once per
+    new file, or restores it from disk cache if this exact file was
+    processed before (this is what survives a page refresh, via the hash
+    stored in st.query_params)."""
     if st.session_state.get("processed_file_name") == uploaded_file.name:
         return
+
+    file_bytes = uploaded_file.getvalue()  # safe: doesn't disturb the read position load_document() uses
+    file_hash = hash_file_bytes(file_bytes)
+
+    cached = load_paper(file_hash)
+    if cached:
+        data, store = cached
+        st.session_state.processed_file_name = data["file_name"]
+        st.session_state.cleaned_text = data["cleaned_text"]
+        st.session_state.chunks = data["chunks"]
+        st.session_state.parsed = data["parsed"]
+        st.session_state.section_chunks = data["section_chunks"]
+        st.session_state.vector_store = store
+        st.query_params["paper"] = file_hash
+
+        cached_analysis = load_analysis(file_hash)
+        if cached_analysis:
+            st.session_state.last_analysis = cached_analysis["analysis"]
+            st.session_state.last_analysis_lang = cached_analysis["lang_code"]
+
+        st.session_state.pop(f"audio_paper_{uploaded_file.name}", None)
+        st.session_state.pop("audio_analysis", None)
+        return
+
     with st.spinner("Reading and preparing document..."):
         raw_text = load_document(uploaded_file)
         cleaned_text = clean_text(raw_text)
@@ -66,12 +114,15 @@ def process_uploaded_file(uploaded_file):
         store = VectorStore(dimension=384)
         store.add_chunks(embedded_chunks)
 
+    save_paper(file_hash, uploaded_file.name, cleaned_text, chunks, parsed, section_chunks, store)
+
     st.session_state.processed_file_name = uploaded_file.name
     st.session_state.cleaned_text = cleaned_text
     st.session_state.chunks = chunks
     st.session_state.parsed = parsed
     st.session_state.section_chunks = section_chunks
     st.session_state.vector_store = store
+    st.query_params["paper"] = file_hash
     st.session_state.pop(f"audio_paper_{uploaded_file.name}", None)
     st.session_state.pop("audio_analysis", None)
 
@@ -306,6 +357,12 @@ if page == "AI analysis":
                     st.session_state.last_analysis = analysis
                     st.session_state.last_analysis_lang = lang_code
                     st.session_state.pop("audio_analysis", None)
+
+                    # Cache the analysis too, so it survives a refresh
+                    # alongside the paper itself (keyed off the same hash
+                    # that's already sitting in st.query_params).
+                    if "paper" in st.query_params:
+                        save_analysis(st.query_params["paper"], analysis, lang_code)
                 except Exception as e:
                     st.error(f"Analysis failed: {e}")
         card_close()

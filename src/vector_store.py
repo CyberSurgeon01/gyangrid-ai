@@ -5,6 +5,9 @@ Stores (vector, section, text) triples and supports similarity search,
 optionally filtered by section name.
 """
 
+import pickle
+from pathlib import Path
+
 import faiss
 import numpy as np
 
@@ -66,4 +69,30 @@ class VectorStore:
     def is_empty(self) -> bool:
         return self.index.ntotal == 0
 
-    #need to upadate 
+    # ── Persistence ──────────────────────────────────────────────────
+    def save(self, path):
+        """Writes the FAISS index and the parallel chunk metadata (incl.
+        embeddings, needed by the section_filter path) to `path`."""
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+        faiss.write_index(self.index, str(path / "index.faiss"))
+        with open(path / "chunks.pkl", "wb") as f:
+            pickle.dump(self.chunks, f)
+
+    @classmethod
+    def load(cls, path):
+        """Reconstructs a VectorStore previously written by save(). Raises
+        FileNotFoundError if `path` doesn't contain a saved store, so
+        callers can catch that and fall back to reprocessing the file."""
+        path = Path(path)
+        index_file = path / "index.faiss"
+        chunks_file = path / "chunks.pkl"
+        if not index_file.exists() or not chunks_file.exists():
+            raise FileNotFoundError(f"No saved vector store at {path}")
+
+        store = cls.__new__(cls)
+        store.index = faiss.read_index(str(index_file))
+        store.dimension = store.index.d
+        with open(chunks_file, "rb") as f:
+            store.chunks = pickle.load(f)
+        return store
