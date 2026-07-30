@@ -1,4 +1,5 @@
-from src.llm_pipeline import analyze_paper, answer_question, _expand_query
+from src.llm_pipeline import analyze_paper, answer_question, _expand_query, classify_is_research_paper
+from src.paper_validator import is_research_paper
 from src.report_export import generate_docx_report, generate_pdf_report
 from src.citation_graph import build_citation_graph, most_cited_references, reference_year_distribution
 import streamlit as st
@@ -109,6 +110,21 @@ def process_uploaded_file(uploaded_file):
         parsed = parse_document(cleaned_text)
         section_chunks = chunk_sections(parsed)
 
+    # Gate before embedding — no point spending embedding time/tokens on a
+    # document that isn't a research paper. Heuristic score resolves clear
+    # cases instantly; only borderline scores trigger the Gemini call.
+    force_key = f"force_analyze_{uploaded_file.name}"
+    if not st.session_state.get(force_key):
+        check = is_research_paper(cleaned_text, parsed, llm_classify_fn=classify_is_research_paper)
+        if not check["verdict"]:
+            st.session_state.pending_reject = {
+                "file_name": uploaded_file.name,
+                "reasons": check["reasons"],
+                "score": check["score"],
+            }
+            return
+    st.session_state.pop("pending_reject", None)
+
     with st.spinner("Generating embeddings (first run may take a minute to load the model)..."):
         embedded_chunks = embed_chunks(section_chunks)
         store = VectorStore(dimension=384)
@@ -150,7 +166,25 @@ if page in ("Dashboard", "Upload paper"):
     card_close()
     if uploaded_file:
         process_uploaded_file(uploaded_file)
-        st.success("Document processed and embedded successfully.")
+        if st.session_state.get("processed_file_name") == uploaded_file.name:
+            st.success("Document processed and embedded successfully.")
+
+    _reject = st.session_state.get("pending_reject")
+    if uploaded_file and _reject and _reject["file_name"] == uploaded_file.name:
+        card_open("", "")
+        st.error(
+            f"This doesn't look like a research paper (confidence score: "
+            f"{_reject['score']}/100). Please upload a research paper — one "
+            "with an abstract, sections like Introduction/Methodology/"
+            "Conclusion, and a reference list."
+        )
+        with st.expander("Why was this flagged?"):
+            for reason in _reject["reasons"]:
+                st.write(f"- {reason}")
+        if st.button("Analyze anyway", key=f"force_analyze_btn_{uploaded_file.name}"):
+            st.session_state[f"force_analyze_{uploaded_file.name}"] = True
+            st.rerun()
+        card_close()
 
 # ── Dashboard page ───────────────────────────────────────────────────────
 if page == "Dashboard":

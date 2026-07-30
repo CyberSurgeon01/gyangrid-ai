@@ -167,6 +167,58 @@ def analyze_paper(chunks_by_type, language="en", word_limit=None, model_name=Non
     return result
 
 
+def classify_is_research_paper(text: str) -> Dict[str, Any]:
+    """
+    Semantic fallback check for src/paper_validator.py — only called for
+    documents whose structural heuristic score is borderline (an obvious
+    paper or an obvious non-paper never needs this network call).
+
+    Returns {"is_paper": bool, "reason": str}. Deliberately does NOT raise
+    on a malformed model response — paper_validator.py treats a failure
+    here as "unavailable" and falls back to the heuristic score rather
+    than blocking the upload on a transient API issue.
+    """
+    model = genai.GenerativeModel(GEMINI_MODEL)
+
+    prompt = f"""You are a classifier deciding whether the text below is from an
+academic/scientific research paper (journal article, conference paper, preprint,
+thesis chapter, technical report with citations, etc.) as opposed to something
+else entirely (resume, invoice, blog post, news article, slide deck export,
+personal notes, marketing material, etc.).
+
+Return ONLY a single valid JSON object — no markdown fences, no preamble.
+The JSON object MUST have exactly these keys:
+- "is_paper": boolean
+- "reason": string, one short sentence explaining the decision
+
+Base your judgment on writing register, presence of academic structure
+(abstract-like framing, methodology, citations, findings), and subject
+matter — not on formatting artifacts from PDF extraction.
+
+--- TEXT SAMPLE ---
+{text}
+--- END SAMPLE ---
+
+Return the JSON object now.
+"""
+
+    try:
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                response_mime_type="application/json",
+                temperature=0.0,
+            ),
+        )
+        result = _extract_json(response.text)
+        return {
+            "is_paper": bool(result.get("is_paper")),
+            "reason": str(result.get("reason", "")),
+        }
+    except Exception as e:
+        return {"is_paper": None, "reason": f"classification failed: {e}"}
+
+
 def translate_summary(text: str, target_language: str = "bn") -> str:
     model = genai.GenerativeModel(GEMINI_MODEL)
     lang_name = "Bangla" if target_language == "bn" else target_language
