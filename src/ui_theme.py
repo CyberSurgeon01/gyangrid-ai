@@ -232,19 +232,31 @@ def _theme_toggle_knob_uri(name: str, icon_color: str, knob_bg: str) -> str:
     return f"data:image/svg+xml;base64,{b64}"
 
 
-def _sidebar_nav_icon_css(icon_names: list[str]) -> str:
+def _button_key_css_class(key: str) -> str:
+    """Mirrors Streamlit's own key->CSS-class sanitizer (`st-key-<key>`,
+    with any char outside [a-zA-Z0-9_-] replaced by '-'), so we can target
+    a specific nav button reliably instead of guessing its DOM position."""
+    import re
+    return "st-key-" + re.sub(r"[^a-zA-Z0-9_-]", "-", key.strip())
+
+
+def _sidebar_nav_icon_css(icon_keys: list[tuple[str, str]]) -> str:
     """Builds CSS that pins an icon (as a ::before mask) onto each sidebar
-    nav button, in order. Buttons are matched by position since raw
-    st.button() has no way to embed HTML/SVG inside its label."""
+    nav button. Each button is matched via its own Streamlit `key` (which
+    Streamlit exposes as a stable `st-key-<key>` class on the button's
+    wrapper), so icons stay attached to the right button regardless of
+    render order — unlike positional matching, which breaks because each
+    button gets its own isolated wrapper."""
     rules = []
-    for i, name in enumerate(icon_names, start=1):
+    for name, key in icon_keys:
         uri = _icon_mask_data_uri(name)
         if not uri:
             continue
+        css_class = _button_key_css_class(key)
         rules.append(f"""
-        section[data-testid="stSidebar"] div.stButton:nth-of-type({i}) button::before {{
+        section[data-testid="stSidebar"] .{css_class} button::before {{
             content: "";
-            width: 19px; height: 19px; flex-shrink: 0;
+            width: 23px; height: 23px; flex-shrink: 0;
             display: inline-block;
             background-color: currentColor;
             -webkit-mask-image: url("{uri}");
@@ -903,10 +915,11 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
 
     c = _colors()
 
-    # Icons are pinned onto buttons via a positional CSS mask, since
-    # st.button() can't render HTML/SVG inside its own label.
-    icon_order = [icon for _, items in sections for icon, _ in items]
-    st.html(f"<style>{_sidebar_nav_icon_css(icon_order)}</style>")
+    # Icons are pinned onto buttons via a CSS mask keyed to each button's
+    # own `key`, since st.button() can't render HTML/SVG inside its own
+    # label.
+    icon_keys = [(icon, f"nav_{label}") for _, items in sections for icon, label in items]
+    st.html(f"<style>{_sidebar_nav_icon_css(icon_keys)}</style>")
 
     with st.sidebar:
         st.html(
