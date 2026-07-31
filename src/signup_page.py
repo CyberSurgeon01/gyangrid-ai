@@ -354,6 +354,12 @@ def _inject_auth_css():
     [data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentError"] p {{
         font-size: 16px !important;
     }}
+    /* Hide Streamlit's own "Press Enter to apply · X/Y" hint that
+       appears under a text input while it hasn't been committed yet —
+       it reads as stray UI noise on this form. */
+    [data-testid="InputInstructions"] {{
+        display: none !important;
+    }}
     </style>
     """)
 
@@ -364,10 +370,11 @@ def _redirect_url() -> str:
     return st.secrets.get("APP_URL", "http://localhost:8501")
 
 
-def _sign_up(email: str, password: str, confirm: str) -> str | None:
-    """Validates input, then attempts a real Supabase sign-up. Returns an
-    error message to show the user, or None on success (in which case
-    st.session_state has already been populated for the new user)."""
+def _send_signup_otp(email: str, password: str, confirm: str) -> str | None:
+    """Step 1: validates input, then creates the account (with the
+    user's real, final password already set) and asks Supabase to email
+    a verification code. The account exists but stays unconfirmed/
+    unusable until the code is verified in step 2."""
     if not email or "@" not in email:
         return "Please enter a valid email address."
     if len(password) < 8:
@@ -381,33 +388,89 @@ def _sign_up(email: str, password: str, confirm: str) -> str | None:
     except Exception as e:
         msg = str(e)
         if "already registered" in msg.lower() or "already exists" in msg.lower():
-            return "An account with this email already exists. Try logging in instead."
-        return f"Sign-up failed: {msg}"
+            return "An account with this email already exists. Please use a different email or log in instead."
+        return f"Couldn't send the code: {msg}"
 
-    if not result.user:
-        return "Sign-up failed. Please try again."
+    # Supabase doesn't raise an error for an already-registered email when
+    # email confirmation is on (to avoid leaking which emails are
+    # registered) — instead it silently returns a user with an empty
+    # `identities` list. That's the signal we check for here.
+    identities = getattr(result.user, "identities", None) if result.user else None
+    if identities is not None and len(identities) == 0:
+        return "An account with this email already exists. Please use a different email or log in instead."
 
-    # If email confirmation is required, Supabase returns a user but no
-    # active session yet — don't log them in until that's done.
-    if result.session:
-        st.session_state.auth_status = "user"
-        st.session_state.user_email = result.user.email
-        st.session_state.user_id = result.user.id
-    else:
-        st.session_state.pending_email_confirmation = email
-
+    st.session_state.signup_otp_email = email
+    st.session_state.signup_otp_sent = True
     return None
 
 
-def render_signup_page():
-    c = theme_colors()
-    _inject_auth_css()
+def _verify_signup_otp(email: str, token: str) -> str | None:
+    """Step 2: verifies the 6-digit code, which finalizes the account.
+    Supabase's verify_otp() call inherently authenticates the user (it
+    creates a persisted session as a side effect) — but app.py restores
+    that session automatically on the very next rerun and logs the user
+    straight into the app, skipping the intended "go log in yourself"
+    hand-off. Explicitly signing out right after verifying avoids that:
+    the account is confirmed and ready, but no live session is left
+    behind for app.py to pick up."""
+    if not token or not token.strip():
+        return "Please enter the verification code."
 
+    try:
+        sb = get_supabase()
+        result = sb.auth.verify_otp({
+            "email": email,
+            "token": token.strip(),
+            "type": "signup",
+        })
+    except Exception as e:
+        msg = str(e)
+        if "rate limit" in msg.lower():
+            return "Too many attempts. Please wait a moment and try again."
+        # Supabase returns the same generic error ("Token has expired or
+        # is invalid") for both a wrong code and an expired one, so there's
+        # no reliable way to tell them apart from the message alone.
+        return "Incorrect or expired code. Please double-check it, or resend a new one below."
+
+    if not result.user:
+        return "Verification failed. Please try again."
+
+    try:
+        sb.auth.sign_out()
+    except Exception:
+        pass  # best-effort — even if this fails, app.py will just log them in early
+
+    for key in ("signup_otp_email", "signup_otp_sent", "signup_otp", "signup_password", "signup_confirm"):
+        st.session_state.pop(key, None)
+    st.session_state.signup_complete = True
+    return None
+
+
+def _resend_signup_otp(email: str) -> str | None:
+    """Asks Supabase to re-send the sign-up verification code."""
+    try:
+        sb = get_supabase()
+        sb.auth.resend({"type": "signup", "email": email})
+    except Exception as e:
+        return f"Couldn't resend the code: {e}"
+    return None
+
+
+def _render_signup_header(c, title: str, subtitle: str):
     st.html(f"""
     <div class="gg-auth-logo">{icon_svg('brain', 44, c['accent'])}GyanGrid AI</div>
-    <div class="gg-auth-title">Create your account</div>
-    <div class="gg-auth-subtitle">Sign up to start uploading papers and getting AI-powered research insights.</div>
+    <div class="gg-auth-title">{title}</div>
+    <div class="gg-auth-subtitle">{subtitle}</div>
     """)
+
+
+def _render_email_step(c):
+    """Step 1 UI: email, password, confirm password, and a Send OTP
+    button (this is what actually creates the account)."""
+    _render_signup_header(
+        c, "Create your account",
+        "Sign up to start uploading papers and getting AI-powered research insights.",
+    )
 
     email = st.text_input("Email", placeholder="you@example.com", key="signup_email")
     password = st.text_input(
@@ -417,15 +480,9 @@ def render_signup_page():
         "Confirm Password", placeholder="Re-enter your password", type="password", key="signup_confirm"
     )
 
-    if st.session_state.get("pending_email_confirmation"):
-        st.info(
-            f"Check **{st.session_state.pending_email_confirmation}** for a confirmation "
-            "link, then come back and log in."
-        )
-
-    if st.button("Sign Up", type="primary", use_container_width=True, key="signup_submit"):
-        with st.spinner("Creating your account..."):
-            error = _sign_up(email, password, confirm)
+    if st.button("Send OTP", type="primary", use_container_width=True, key="signup_send_otp"):
+        with st.spinner("Sending verification code..."):
+            error = _send_signup_otp(email, password, confirm)
         if error:
             st.error(error)
         else:
@@ -456,3 +513,58 @@ def render_signup_page():
         if st.button("Log In", key="signup_goto_login", use_container_width=False):
             st.session_state.auth_view = "login"
             st.rerun()
+
+
+def _render_otp_step(c, email: str):
+    """Step 2 UI: shown once a code has been emailed. Verifying here
+    finalizes account creation and sends the user to the login page —
+    it does not log them in directly (see _verify_signup_otp)."""
+    _render_signup_header(
+        c, "Enter verification code",
+        f"We sent a code to <b>{email}</b>. Verifying it creates your account — you'll log in right after.",
+    )
+
+    otp = st.text_input(
+        "Verification code", placeholder="000000", max_chars=10, key="signup_otp",
+    )
+
+    if st.button("Verify", type="primary", use_container_width=True, key="signup_otp_verify"):
+        with st.spinner("Verifying..."):
+            error = _verify_signup_otp(email, otp)
+        if error:
+            st.error(error)
+        else:
+            st.session_state.auth_view = "login"
+            st.rerun()
+
+    st.html('<p class="gg-auth-footer-text" style="text-align:center; margin-top:20px;">Didn\'t receive the code?</p>')
+    if st.button("Resend code", use_container_width=True, key="signup_otp_resend"):
+        with st.spinner("Resending..."):
+            error = _resend_signup_otp(email)
+        if error:
+            st.error(error)
+        else:
+            st.success("A new code is on its way.")
+
+    st.html('<div class="gg-auth-footer-row">')
+    col_text, col_btn = st.columns([1, 1], gap="small", vertical_alignment="center")
+    with col_text:
+        st.html('<p class="gg-auth-footer-text">Wrong email?</p>')
+    with col_btn:
+        if st.button("Change email", key="signup_otp_back", use_container_width=False):
+            for key in ("signup_otp_email", "signup_otp_sent"):
+                st.session_state.pop(key, None)
+            st.rerun()
+
+
+def render_signup_page():
+    c = theme_colors()
+    _inject_auth_css()
+
+    otp_email = st.session_state.get("signup_otp_email")
+    otp_sent = st.session_state.get("signup_otp_sent")
+
+    if otp_sent and otp_email:
+        _render_otp_step(c, otp_email)
+    else:
+        _render_email_step(c)

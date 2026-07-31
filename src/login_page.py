@@ -447,6 +447,9 @@ def render_login_page():
     <div class="gg-auth-subtitle">Sign in to access your workspace and pick up right where you left off.</div>
     """)
 
+    if st.session_state.pop("signup_complete", False):
+        st.success("Your account has been created! Please log in below.")
+
     email = st.text_input("Email", placeholder="you@example.com", key="login_email")
     password = st.text_input(
         "Password", placeholder="Enter your password", type="password", key="login_password"
