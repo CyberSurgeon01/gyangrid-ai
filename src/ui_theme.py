@@ -10,6 +10,7 @@ Icons are inline SVG (no external CDN) so they can never fail to load.
 import base64
 import textwrap
 import streamlit as st
+from streamlit.components.v1 import html as _components_html
 
 # ── Light palette ────────────────────────────────────────────────────────
 COLORS = {
@@ -93,6 +94,13 @@ DARK_COLORS = {
 def _colors() -> dict:
     """Returns the active color palette based on st.session_state.dark_mode."""
     return DARK_COLORS if st.session_state.get("dark_mode", False) else COLORS
+
+
+def theme_colors() -> dict:
+    """Public accessor for the active color palette — use this from
+    outside ui_theme.py (e.g. src/login_page.py, src/signup_page.py)
+    instead of reaching into the private _colors()."""
+    return _colors()
 
 
 # ── Inline SVG icon set (Feather-style, no external dependency) ─────────
@@ -684,6 +692,18 @@ def inject_base_css():
         [data-testid="stFileUploaderDropzoneInstructions"] span {{
             font-size: 16px !important;
         }}
+        [data-testid="stFileUploaderDropzoneInstructions"] small,
+        [data-testid="stFileUploaderDropzoneInstructions"] span:nth-of-type(2) {{
+            font-size: 0 !important;
+            line-height: 0 !important;
+        }}
+        [data-testid="stFileUploaderDropzoneInstructions"] small::after,
+        [data-testid="stFileUploaderDropzoneInstructions"] span:nth-of-type(2)::after {{
+            content: "Please upload a PDF or DOCX file (maximum size: 20 MB)";
+            font-size: 14px !important;
+            line-height: 1.4 !important;
+            display: inline-block;
+        }}
 
         button[title*="mode"] {{
             width: 40px !important;
@@ -886,6 +906,38 @@ def inject_base_css():
         </style>
         """
     st.html(textwrap.dedent(css).strip())
+
+    # Streamlit sets a native HTML `title` attribute on the file-uploader
+    # dropzone (for accessibility) containing its own default text — this
+    # shows up as a plain browser tooltip on hover and is NOT reachable by
+    # CSS, since native title tooltips aren't part of the styleable DOM.
+    # We strip it via JS so only our CSS-swapped instructions text shows.
+    _components_html(
+        """
+        <script>
+        function stripUploaderTitles() {
+            const doc = window.parent.document;
+            doc.querySelectorAll(
+                '[data-testid="stFileUploaderDropzone"] [title],' +
+                '[data-testid="stFileUploaderDropzoneInstructions"] [title]'
+            ).forEach(el => el.removeAttribute('title'));
+        }
+        stripUploaderTitles();
+        const _gg_observer = new MutationObserver(stripUploaderTitles);
+        _gg_observer.observe(window.parent.document.body, {childList: true, subtree: true});
+        </script>
+        """,
+        height=0,
+    )
+
+
+def render_logout_button():
+    """Renders a small 'Log out' control for the sidebar footer — clears
+    auth_status so the next rerun falls back to render_auth_page()."""
+    if st.button("Log out", use_container_width=True, key="gg_logout_btn"):
+        for key in ("auth_status", "user_name", "user_email"):
+            st.session_state.pop(key, None)
+        st.rerun()
 
 
 def render_topbar():

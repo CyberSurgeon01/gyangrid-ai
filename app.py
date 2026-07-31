@@ -11,10 +11,13 @@ from src.embeddings import embed_chunks, embed_query
 from src.vector_store import VectorStore
 from src.paper_cache import hash_file_bytes, save_paper, load_paper, save_analysis, load_analysis
 from src.audio_player import render_audio_player
+from src.login_page import render_login_page
+from src.signup_page import render_signup_page
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
     render_dark_mode_toggle,
+    render_logout_button,
     card_open,
     card_close,
     metric_tile,
@@ -38,6 +41,22 @@ if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = st.query_params.get("theme") == "dark"
 
 inject_base_css()
+
+# ── Auth gate: login/sign-up is the landing page ────────────────────────
+# Guests can proceed without an account (auth_status = "guest"), but
+# nothing they upload gets persisted — see save_paper/load_paper calls
+# below, which should be made conditional on auth_status == "user" once
+# real per-user storage (e.g. Supabase) is wired in.
+if "auth_status" not in st.session_state:
+    st.session_state.auth_status = None
+
+if st.session_state.auth_status is None:
+    if st.session_state.get("auth_view") == "signup":
+        render_signup_page()
+    else:
+        render_login_page()
+    st.stop()
+
 page = render_sidebar_nav(default="Dashboard")
 
 # ── Restore a previously-processed paper after a page refresh ───────────
