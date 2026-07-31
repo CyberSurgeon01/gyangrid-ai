@@ -3,20 +3,24 @@ Sign-up page for GyanGrid AI.
 
 Renders the same centered auth card style as login_page.py, but for new
 account creation: email, password, confirm password, a sign-up button,
-social sign-up buttons with real Google/Apple marks, and a link back to
+social sign-up button with real Google mark, and a link back to
 Log In.
 
 --------------------------------------------------------------------------
 v2 audit / rebuild notes — kept in lockstep with login_page.py
 --------------------------------------------------------------------------
 Same 8px spacing scale and shared control tokens as the login page:
-  - CARD_MAX_WIDTH = 840px, CARD_PADDING = 56px 64px
-  - CONTROL_HEIGHT = 56px for every input AND every button
-  - RADIUS_CARD = 20px, RADIUS_CONTROL = 14px, RADIUS_PILL = 12px
+  - CARD_MAX_WIDTH = 880px, CARD_PADDING = 64px 72px
+  - CONTROL_HEIGHT = 64px for every input AND every button
+  - RADIUS_CARD = 24px, RADIUS_CONTROL = 14px, RADIUS_PILL = 12px
+
+v3 scale-up: same 30–40% bolder pass as login_page.py — larger logo/
+heading/subtitle, 17px labels, 20px button text, and wider section
+spacing (field gaps 16→24px, button gaps 16→20px).
 
 Fixes applied: vertical + horizontal centering of the card, unified
 input/button sizing (email, password, confirm-password, Sign Up, Google,
-Apple, Guest are all identical height/radius/typography), a balanced OR
+Guest are all identical height/radius/typography), a balanced OR
 divider, room reserved for the native password reveal-icon on both
 password fields, and a footer where "Already have an account?" and the
 "Log In" button sit on one aligned line via st.columns instead of a tiny
@@ -26,8 +30,8 @@ Note on approach: same as login_page.py — the card look is applied
 directly to Streamlit's own `div.block-container` rather than a separate
 opened/closed `<div>` via st.html, since st.html() renders each call as
 its own isolated element and doesn't actually nest later widgets inside
-it. The Google/Apple logos are drawn as CSS ::before backgrounds pinned
-onto each button by its Streamlit `key`, since st.button() only accepts
+it. The Google logo is drawn as a CSS ::before background pinned
+onto the button by its Streamlit `key`, since st.button() only accepts
 a plain text label.
 
 Wiring notes:
@@ -35,8 +39,8 @@ Wiring notes:
   password length, passwords match) and then sets
   st.session_state.auth_status = "user". Swap _validate_signup() out for
   real account creation (Supabase, Firebase, etc.) when that's wired in.
-- "Continue with Google" / "Continue with Apple" are left as visual
-  placeholders (no OAuth wired yet), same as on the login page.
+- "Continue with Google" is left as a visual placeholder (no OAuth wired
+  yet), same as on the login page.
 - Clicking "Log In" sets auth_view -> "login" and reruns; app.py reads
   st.session_state.auth_view to decide which page to show.
 """
@@ -45,8 +49,8 @@ import base64
 import streamlit as st
 from src.ui_theme import theme_colors, icon_svg
 
-# ── Google "G" mark (official 4-colour logo) and Apple silhouette ───────
-# Kept as an identical copy of login_page.py's versions (rather than a
+# ── Google "G" mark (official 4-colour logo) ───────
+# Kept as an identical copy of login_page.py's version (rather than a
 # shared import) so this file can be styled independently if the two
 # pages ever diverge.
 _GOOGLE_G_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
@@ -61,16 +65,6 @@ c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
 c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
 </svg>"""
 
-_APPLE_SILHOUETTE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="{color}">
-<path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03
--.014-.11-.032-.23-.032-.36 0-1.09.55-2.2 1.19-2.98.7-.85 1.99-1.51 3.014-1.55.019.087.03.187.03.27z
-M20.929 17.14c-.06.13-.32.86-1.02 1.87-.61.89-1.28 1.87-2.14 1.87-.85 0-1.11-.51-2.06-.51-.98 0-1.29.51
--2.08.51-.83 0-1.53-.94-2.14-1.83-1.6-2.3-2.82-6.5-1.18-9.34.81-1.4 2.28-2.28 3.85-2.31.86-.02 1.66.58
-2.19.58.51 0 1.5-.72 2.53-.61.43.02 1.65.17 2.43 1.31-.06.04-1.45.85-1.43 2.52.02 2 1.75 2.67 1.77 2.68
--.02.06-.28.96-.94 1.9z"/>
-</svg>"""
-
-
 def _data_uri(svg: str) -> str:
     return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
 
@@ -79,14 +73,9 @@ def _google_icon_uri() -> str:
     return _data_uri(_GOOGLE_G_SVG)
 
 
-def _apple_icon_uri(color: str) -> str:
-    return _data_uri(_APPLE_SILHOUETTE_SVG.format(color=color))
-
-
 def _inject_auth_css():
     c = theme_colors()
     google_uri = _google_icon_uri()
-    apple_uri = _apple_icon_uri(c["text_primary"])
 
     st.html(f"""
     <style>
@@ -108,13 +97,13 @@ def _inject_auth_css():
     }}
     div.block-container {{
         width: 100%;
-        max-width: 840px !important;
-        margin: 32px auto !important;
-        padding: 56px 64px !important;
+        max-width: 880px !important;
+        margin: 40px auto !important;
+        padding: 64px 72px !important;
         background: {c['surface']};
         border: 1px solid {c['border']};
-        border-radius: 20px;
-        box-shadow: 0 24px 56px rgba(15, 23, 42, 0.14);
+        border-radius: 24px;
+        box-shadow: 0 32px 72px rgba(15, 23, 42, 0.16);
     }}
 
     /* ============================================================
@@ -124,25 +113,25 @@ def _inject_auth_css():
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 12px;
+        gap: 14px;
         font-weight: 700;
-        font-size: 26px;
+        font-size: 34px;
         color: {c['text_primary']};
-        margin-bottom: 32px;
+        margin-bottom: 40px;
     }}
     .gg-auth-title {{
         text-align: center;
-        font-size: 40px;
+        font-size: 60px;
         font-weight: 700;
-        line-height: 1.25;
+        line-height: 1.2;
         color: {c['text_primary']};
-        margin-bottom: 12px;
+        margin-bottom: 16px;
     }}
     .gg-auth-subtitle {{
         text-align: center;
-        font-size: 19px;
+        font-size: 21px;
         color: {c['text_secondary']};
-        margin-bottom: 40px;
+        margin-bottom: 48px;
         line-height: 1.55;
         padding: 0 16px;
     }}
@@ -151,13 +140,13 @@ def _inject_auth_css():
        FORM FIELDS — identical width/height/radius across the board
        ============================================================ */
     label, .stTextInput label p, [data-testid="stWidgetLabel"] p {{
-        font-size: 16px !important;
+        font-size: 17px !important;
         font-weight: 600 !important;
         color: {c['text_primary']};
-        margin-bottom: 6px !important;
+        margin-bottom: 8px !important;
     }}
     div[data-testid="stTextInput"] {{
-        margin-bottom: 16px !important;
+        margin-bottom: 24px !important;
     }}
     div[data-testid="stTextInput"] > div {{
         border-radius: 14px !important;
@@ -218,12 +207,12 @@ def _inject_auth_css():
        BUTTONS — every button (primary, social, guest) shares the
        same height/radius/typography so nothing looks mismatched.
        ============================================================ */
-    div.stButton {{ margin-bottom: 16px !important; }}
+    div.stButton {{ margin-bottom: 20px !important; }}
     div.stButton > button, div.stDownloadButton > button {{
         width: 100% !important;
         height: 64px !important;
         min-height: 64px !important;
-        font-size: 18px !important;
+        font-size: 20px !important;
         font-weight: 600 !important;
         border-radius: 14px !important;
         display: flex;
@@ -257,10 +246,10 @@ def _inject_auth_css():
         align-items: center;
         text-align: center;
         color: {c['text_muted']};
-        font-size: 14px;
+        font-size: 15px;
         font-weight: 600;
         letter-spacing: 0.04em;
-        margin: 32px 0;
+        margin: 36px 0;
     }}
     .gg-auth-divider::before, .gg-auth-divider::after {{
         content: "";
@@ -272,38 +261,23 @@ def _inject_auth_css():
 
     /* Social buttons: identical size, radius, spacing, icon alignment */
     .st-key-signup_google button,
-    .st-key-signup_apple button,
     .st-key-signup_guest button {{
         position: relative !important;
         background: {c['surface']} !important;
         border: 1px solid {c['border']} !important;
         color: {c['text_primary']} !important;
     }}
-    .st-key-signup_google button::before,
-    .st-key-signup_apple button::before {{
+    .st-key-signup_google button::before {{
         content: "";
         position: absolute;
-        left: 22px;
+        left: 26px;
         top: 50%;
         transform: translateY(-50%);
-        width: 22px;
-        height: 22px;
+        width: 24px;
+        height: 24px;
         background-repeat: no-repeat;
         background-size: contain;
-    }}
-    .st-key-signup_google button::before {{
         background-image: url("{google_uri}");
-    }}
-    .st-key-signup_apple button::before {{
-        background-color: {c['text_primary']};
-        -webkit-mask-image: url("{apple_uri}");
-        mask-image: url("{apple_uri}");
-        -webkit-mask-size: contain;
-        mask-size: contain;
-        -webkit-mask-repeat: no-repeat;
-        mask-repeat: no-repeat;
-        -webkit-mask-position: center;
-        mask-position: center;
     }}
 
     /* ============================================================
@@ -313,7 +287,7 @@ def _inject_auth_css():
        collapsed to ~4px so the link starts right after the "?".
        ============================================================ */
     .gg-auth-footer-row [data-testid="stHorizontalBlock"] {{
-        align-items: flex-end !important;
+        align-items: center !important;
         justify-content: center;
         gap: 4px;
         margin-top: 32px;
@@ -327,13 +301,12 @@ def _inject_auth_css():
         min-width: 0 !important;
     }}
     .gg-auth-footer-text {{
-        font-size: 17px;
+        font-size: 18px;
         line-height: 1;
         color: {c['text_secondary']};
         text-align: right;
         white-space: nowrap;
         margin: 0;
-        padding-bottom: 2px;
     }}
     /* Plain text link: no border, no background, no box — only the
        "Log In" label itself is clickable. Selector specificity is
@@ -345,9 +318,8 @@ def _inject_auth_css():
         height: auto !important;
         min-height: 0 !important;
         padding: 0 !important;
-        padding-bottom: 2px !important;
         width: auto !important;
-        font-size: 17px !important;
+        font-size: 18px !important;
         font-weight: 600 !important;
         border-radius: 0 !important;
         background: transparent !important;
@@ -403,7 +375,7 @@ def render_signup_page():
     _inject_auth_css()
 
     st.html(f"""
-    <div class="gg-auth-logo">{icon_svg('brain', 28, c['accent'])}GyanGrid AI</div>
+    <div class="gg-auth-logo">{icon_svg('brain', 44, c['accent'])}GyanGrid AI</div>
     <div class="gg-auth-title">Create your account</div>
     <div class="gg-auth-subtitle">Sign up to start uploading papers and getting AI-powered research insights.</div>
     """)
@@ -429,8 +401,6 @@ def render_signup_page():
 
     if st.button("Continue with Google", use_container_width=True, key="signup_google"):
         st.info("Google sign-up isn't connected yet — coming soon.")
-    if st.button("Continue with Apple", use_container_width=True, key="signup_apple"):
-        st.info("Apple sign-up isn't connected yet — coming soon.")
     if st.button("Continue as Guest", use_container_width=True, key="signup_guest"):
         st.session_state.auth_status = "guest"
         st.rerun()
