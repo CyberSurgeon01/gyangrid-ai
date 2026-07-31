@@ -57,11 +57,10 @@ ui_theme.py already uses for sidebar nav icons) since st.button() only
 accepts a plain text label. Icon-bearing buttons get extra left padding
 so the label optically centers instead of colliding with the icon.
 
-Wiring notes (unchanged):
-- On "Sign In", this does a placeholder validation (non-empty email +
-  password) and sets st.session_state.auth_status = "user". Swap
-  _validate_credentials() out for real auth (Supabase, Firebase, etc.)
-  when that's wired in.
+Wiring notes:
+- On "Sign In", this calls Supabase's sign_in_with_password() via
+  _sign_in() and sets st.session_state.auth_status = "user" only on a
+  successful, real authentication.
 - "Continue with Google" is left as a visual placeholder (no OAuth wired
   yet) so it doesn't silently pretend to authenticate someone. "Continue without login" is fully functional since
   app.py already branches on auth_status == "guest".
@@ -72,6 +71,7 @@ Wiring notes (unchanged):
 import base64
 import streamlit as st
 from src.ui_theme import theme_colors, icon_svg
+from src.supabase_client import get_supabase
 
 # ── Google "G" mark (official 4-colour logo) ───────
 # Google's mark needs its real colours, so it's embedded as a
@@ -399,13 +399,30 @@ def _inject_auth_css():
     """)
 
 
-def _validate_credentials(email: str, password: str) -> str | None:
-    """Placeholder credential check. Returns an error message, or None
-    if the credentials are acceptable. Replace with real auth later."""
+def _sign_in(email: str, password: str) -> str | None:
+    """Attempts a real Supabase sign-in. Returns an error message to show
+    the user, or None on success (in which case st.session_state has
+    already been populated with the authenticated user)."""
     if not email or not password:
         return "Please enter both your email and password."
     if "@" not in email:
         return "Please enter a valid email address."
+
+    try:
+        sb = get_supabase()
+        result = sb.auth.sign_in_with_password({"email": email, "password": password})
+    except Exception as e:
+        msg = str(e)
+        if "Invalid login credentials" in msg:
+            return "Incorrect email or password."
+        return f"Sign-in failed: {msg}"
+
+    if not result.user:
+        return "Incorrect email or password."
+
+    st.session_state.auth_status = "user"
+    st.session_state.user_email = result.user.email
+    st.session_state.user_id = result.user.id
     return None
 
 
@@ -427,12 +444,11 @@ def render_login_page():
     st.html('<div class="gg-auth-forgot"><a href="#">Forgot Password?</a></div>')
 
     if st.button("Sign In", type="primary", use_container_width=True, key="login_submit"):
-        error = _validate_credentials(email, password)
+        with st.spinner("Signing in..."):
+            error = _sign_in(email, password)
         if error:
             st.error(error)
         else:
-            st.session_state.auth_status = "user"
-            st.session_state.user_email = email
             st.rerun()
 
     st.html('<div class="gg-auth-divider">OR</div>')

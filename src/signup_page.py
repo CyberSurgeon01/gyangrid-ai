@@ -35,10 +35,10 @@ onto the button by its Streamlit `key`, since st.button() only accepts
 a plain text label.
 
 Wiring notes:
-- On "Sign Up", this does placeholder validation (valid-ish email,
-  password length, passwords match) and then sets
-  st.session_state.auth_status = "user". Swap _validate_signup() out for
-  real account creation (Supabase, Firebase, etc.) when that's wired in.
+- On "Sign Up", this validates input then calls Supabase's sign_up() via
+  _sign_up(). If Supabase requires email confirmation, the user is
+  shown a "check your inbox" message instead of being logged in
+  immediately.
 - "Continue with Google" is left as a visual placeholder (no OAuth wired
   yet), same as on the login page.
 - Clicking "Log In" sets auth_view -> "login" and reruns; app.py reads
@@ -48,6 +48,7 @@ Wiring notes:
 import base64
 import streamlit as st
 from src.ui_theme import theme_colors, icon_svg
+from src.supabase_client import get_supabase
 
 # ── Google "G" mark (official 4-colour logo) ───────
 # Kept as an identical copy of login_page.py's version (rather than a
@@ -357,16 +358,38 @@ def _inject_auth_css():
     """)
 
 
-def _validate_signup(email: str, password: str, confirm: str) -> str | None:
-    """Placeholder sign-up validation. Returns an error message, or None
-    if everything looks acceptable. Replace with real account creation
-    (and server-side validation) later."""
+def _sign_up(email: str, password: str, confirm: str) -> str | None:
+    """Validates input, then attempts a real Supabase sign-up. Returns an
+    error message to show the user, or None on success (in which case
+    st.session_state has already been populated for the new user)."""
     if not email or "@" not in email:
         return "Please enter a valid email address."
     if len(password) < 8:
         return "Password must be at least 8 characters."
     if password != confirm:
         return "Passwords do not match."
+
+    try:
+        sb = get_supabase()
+        result = sb.auth.sign_up({"email": email, "password": password})
+    except Exception as e:
+        msg = str(e)
+        if "already registered" in msg.lower() or "already exists" in msg.lower():
+            return "An account with this email already exists. Try logging in instead."
+        return f"Sign-up failed: {msg}"
+
+    if not result.user:
+        return "Sign-up failed. Please try again."
+
+    # If email confirmation is required, Supabase returns a user but no
+    # active session yet — don't log them in until that's done.
+    if result.session:
+        st.session_state.auth_status = "user"
+        st.session_state.user_email = result.user.email
+        st.session_state.user_id = result.user.id
+    else:
+        st.session_state.pending_email_confirmation = email
+
     return None
 
 
@@ -388,13 +411,18 @@ def render_signup_page():
         "Confirm Password", placeholder="Re-enter your password", type="password", key="signup_confirm"
     )
 
+    if st.session_state.get("pending_email_confirmation"):
+        st.info(
+            f"Check **{st.session_state.pending_email_confirmation}** for a confirmation "
+            "link, then come back and log in."
+        )
+
     if st.button("Sign Up", type="primary", use_container_width=True, key="signup_submit"):
-        error = _validate_signup(email, password, confirm)
+        with st.spinner("Creating your account..."):
+            error = _sign_up(email, password, confirm)
         if error:
             st.error(error)
         else:
-            st.session_state.auth_status = "user"
-            st.session_state.user_email = email
             st.rerun()
 
     st.html('<div class="gg-auth-divider">OR</div>')
