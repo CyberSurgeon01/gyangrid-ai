@@ -13,6 +13,7 @@ from src.paper_cache import hash_file_bytes, save_paper, load_paper, save_analys
 from src.audio_player import render_audio_player
 from src.login_page import render_login_page
 from src.signup_page import render_signup_page
+from src.supabase_client import get_supabase
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
@@ -43,12 +44,20 @@ if "dark_mode" not in st.session_state:
 inject_base_css()
 
 # ── Auth gate: login/sign-up is the landing page ────────────────────────
-# Guests can proceed without an account (auth_status = "guest"), but
-# nothing they upload gets persisted — see save_paper/load_paper calls
-# below, which should be made conditional on auth_status == "user" once
-# real per-user storage (e.g. Supabase) is wired in.
 if "auth_status" not in st.session_state:
     st.session_state.auth_status = None
+
+# Restore Supabase session after page refresh (e.g. post Google OAuth redirect)
+if st.session_state.auth_status is None:
+    try:
+        sb = get_supabase()
+        session = sb.auth.get_session()
+        if session and session.user:
+            st.session_state.auth_status = "user"
+            st.session_state.user_email = session.user.email
+            st.session_state.user_id = session.user.id
+    except Exception:
+        pass
 
 if st.session_state.auth_status is None:
     if st.session_state.get("auth_view") == "signup":

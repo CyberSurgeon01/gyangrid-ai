@@ -10,7 +10,8 @@ import re
 from typing import List, Dict, Any, Optional, Union
 
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 load_dotenv()
 
@@ -23,7 +24,7 @@ if not GEMINI_API_KEY:
         "(see .env.example) before using llm_pipeline."
     )
 
-genai.configure(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 RESPONSE_SCHEMA: Dict[str, Any] = {
     "key_points": [],
@@ -148,12 +149,12 @@ def analyze_paper(chunks_by_type, language="en", word_limit=None, model_name=Non
     if language not in ("en", "bn"):
         raise ValueError("language must be 'en' or 'bn'")
 
-    model = genai.GenerativeModel(model_name or GEMINI_MODEL)
     prompt = _build_prompt(chunks_by_type, language, word_limit)
 
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
+    response = client.models.generate_content(
+        model=model_name or GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             response_mime_type="application/json",
             temperature=0.3,
         ),
@@ -178,8 +179,6 @@ def classify_is_research_paper(text: str) -> Dict[str, Any]:
     here as "unavailable" and falls back to the heuristic score rather
     than blocking the upload on a transient API issue.
     """
-    model = genai.GenerativeModel(GEMINI_MODEL)
-
     prompt = f"""You are a classifier deciding whether the text below is from an
 academic/scientific research paper (journal article, conference paper, preprint,
 thesis chapter, technical report with citations, etc.) as opposed to something
@@ -203,9 +202,10 @@ Return the JSON object now.
 """
 
     try:
-        response = model.generate_content(
-            prompt,
-            generation_config=genai.GenerationConfig(
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.0,
             ),
@@ -220,13 +220,15 @@ Return the JSON object now.
 
 
 def translate_summary(text: str, target_language: str = "bn") -> str:
-    model = genai.GenerativeModel(GEMINI_MODEL)
     lang_name = "Bangla" if target_language == "bn" else target_language
     prompt = (
         f"Translate the following academic text into natural, fluent {lang_name}. "
         f"Return ONLY the translated text, nothing else.\n\n{text}"
     )
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+    )
     return response.text.strip()
 
 
@@ -242,8 +244,6 @@ def answer_question(query: str, retrieved_chunks: list, language: str = "en") ->
         if language == "bn":
             return "এই প্রশ্নের জন্য কাগজে কোনো প্রাসঙ্গিক বিষয়বস্তু পাওয়া যায়নি।"
         return "No relevant content found in the paper for this question."
-
-    model = genai.GenerativeModel(GEMINI_MODEL)
 
     context_text = _chunks_to_text(retrieved_chunks)
 
@@ -268,9 +268,10 @@ Excerpts:
 
 Answer:"""
 
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(temperature=0.2),
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(temperature=0.2),
     )
     return response.text.strip()
 
