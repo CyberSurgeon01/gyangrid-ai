@@ -358,6 +358,12 @@ def _inject_auth_css():
     """)
 
 
+def _redirect_url() -> str:
+    """URL Supabase should send the user back to after Google auth. See
+    the matching helper in login_page.py for the full explanation."""
+    return st.secrets.get("APP_URL", "http://localhost:8501")
+
+
 def _sign_up(email: str, password: str, confirm: str) -> str | None:
     """Validates input, then attempts a real Supabase sign-up. Returns an
     error message to show the user, or None on success (in which case
@@ -428,7 +434,16 @@ def render_signup_page():
     st.html('<div class="gg-auth-divider">OR</div>')
 
     if st.button("Continue with Google", use_container_width=True, key="signup_google"):
-        st.info("Google sign-up isn't connected yet — coming soon.")
+        try:
+            sb = get_supabase()
+            result = sb.auth.sign_in_with_oauth({
+                "provider": "google",
+                "options": {"redirect_to": _redirect_url()},
+            })
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={result.url}">', unsafe_allow_html=True)
+            st.link_button("Continue to Google", result.url, use_container_width=True)
+        except Exception as e:
+            st.error(f"Google sign-up failed to start: {e}")
     if st.button("Continue as Guest", use_container_width=True, key="signup_guest"):
         st.session_state.auth_status = "guest"
         st.rerun()

@@ -399,6 +399,17 @@ def _inject_auth_css():
     """)
 
 
+def _redirect_url() -> str:
+    """URL Supabase should send the user back to after Google auth.
+
+    Streamlit doesn't expose the browser's own origin server-side, so
+    this relies on an explicit APP_URL secret when set (needed once
+    deployed, e.g. Streamlit Community Cloud), and falls back to local
+    dev's default address otherwise.
+    """
+    return st.secrets.get("APP_URL", "http://localhost:8501")
+
+
 def _sign_in(email: str, password: str) -> str | None:
     """Attempts a real Supabase sign-in. Returns an error message to show
     the user, or None on success (in which case st.session_state has
@@ -454,7 +465,16 @@ def render_login_page():
     st.html('<div class="gg-auth-divider">OR</div>')
 
     if st.button("Continue with Google", use_container_width=True, key="login_google"):
-        st.info("Google sign-in isn't connected yet — coming soon.")
+        try:
+            sb = get_supabase()
+            result = sb.auth.sign_in_with_oauth({
+                "provider": "google",
+                "options": {"redirect_to": _redirect_url()},
+            })
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={result.url}">', unsafe_allow_html=True)
+            st.link_button("Continue to Google", result.url, use_container_width=True)
+        except Exception as e:
+            st.error(f"Google sign-in failed to start: {e}")
     if st.button("Continue without login", use_container_width=True, key="login_guest"):
         st.session_state.auth_status = "guest"
         st.rerun()

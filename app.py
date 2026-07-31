@@ -47,7 +47,28 @@ inject_base_css()
 if "auth_status" not in st.session_state:
     st.session_state.auth_status = None
 
-# Restore Supabase session after page refresh (e.g. post Google OAuth redirect)
+# After a Google OAuth redirect, Supabase (using the auth-code / PKCE
+# flow, its current default) sends the user back with a plain query
+# param — http://localhost:8501/?code=xxxx — not a URL hash. Streamlit
+# can read query params directly via st.query_params, so this just
+# exchanges that code for a real session, no client-side JS needed.
+if "code" in st.query_params and st.session_state.auth_status is None:
+    try:
+        sb = get_supabase()
+        sb.auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
+        session = sb.auth.get_session()
+        if session and session.user:
+            st.session_state.auth_status = "user"
+            st.session_state.user_email = session.user.email
+            st.session_state.user_id = session.user.id
+    except Exception as e:
+        st.session_state.oauth_error = str(e)
+    finally:
+        st.query_params.pop("code", None)
+
+# Restore Supabase session after an ordinary page refresh (same-tab
+# reload, not a fresh OAuth redirect) — Supabase's Python client persists
+# the session locally, so get_session() alone is enough for that case.
 if st.session_state.auth_status is None:
     try:
         sb = get_supabase()
@@ -60,6 +81,9 @@ if st.session_state.auth_status is None:
         pass
 
 if st.session_state.auth_status is None:
+    _oauth_err = st.session_state.pop("oauth_error", None)
+    if _oauth_err:
+        st.error(f"Google sign-in failed: {_oauth_err}")
     if st.session_state.get("auth_view") == "signup":
         render_signup_page()
     else:
