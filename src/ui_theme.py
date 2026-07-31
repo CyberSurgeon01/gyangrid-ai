@@ -977,10 +977,23 @@ def force_center_container(container_key: str):
 
 
 def render_logout_button():
-    """Renders a small 'Log out' control for the sidebar footer — clears
-    auth_status so the next rerun falls back to render_auth_page()."""
+    """Renders a small 'Log out' control for the sidebar footer.
+
+    Clearing st.session_state alone isn't enough: Supabase persists its
+    own auth session independently, and app.py's session-restore logic
+    (sb.auth.get_session() near the top of the script) will silently
+    log the user back in on the very next rerun if that Supabase session
+    is still valid. So this must also call sb.auth.sign_out() to
+    actually invalidate the underlying session — not just Streamlit's
+    view of it.
+    """
     if st.button("Log out", use_container_width=True, key="gg_logout_btn"):
-        for key in ("auth_status", "user_name", "user_email"):
+        try:
+            from src.supabase_client import get_supabase
+            get_supabase().auth.sign_out()
+        except Exception:
+            pass  # best-effort — still clear local state below regardless
+        for key in ("auth_status", "user_name", "user_email", "user_id"):
             st.session_state.pop(key, None)
         st.rerun()
 
@@ -1045,14 +1058,16 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
                     st.session_state.nav_page = label
                     st.rerun()
 
+        _footer_name = st.session_state.get("user_email", "Research Workspace")
         st.html(
             '<div class="gg-sidebar-footer">'
             '<div class="gg-avatar">RS</div>'
             '<div class="gg-sidebar-footer-text">'
-            '<span class="gg-sidebar-footer-name">Research Workspace</span>'
+            f'<span class="gg-sidebar-footer-name">{_footer_name}</span>'
             '<span class="gg-sidebar-footer-plan">Free plan</span>'
             '</div></div>'
         )
+        render_logout_button()
 
     return st.session_state.nav_page
 
