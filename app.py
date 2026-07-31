@@ -630,5 +630,5 @@ if page == "Settings":
         label_visibility="collapsed",
         index=0 if st.session_state.get("lang_code", "en") == "en" else 1,
     )
-    st.session_state.lang_code = "bn" if "বাংলা" in lang_choice else "en"
+    st.session_state.lang_code = "bn" if lang_choice and "বাংলা" in lang_choice else "en"
     card_close()

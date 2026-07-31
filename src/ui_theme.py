@@ -931,6 +931,51 @@ def inject_base_css():
     )
 
 
+def force_center_container(container_key: str):
+    """Force a keyed st.container to sit fixed + centered over the full
+    viewport, no matter what Streamlit's own internal CSS does.
+
+    st.html() inserts via innerHTML, and browsers never execute <script>
+    tags inserted that way — so plain CSS is the only lever there, and if
+    Streamlit's own stylesheet targets the element with a more specific
+    selector (e.g. an attribute selector like [data-testid="stVerticalBlock"]),
+    it wins the specificity tiebreak even against our !important rules.
+
+    components.html renders in a real iframe, so its <script> actually
+    runs, and from there window.parent.document reaches the real app DOM
+    (same trick already used above for stripUploaderTitles). Setting
+    styles via el.style.setProperty(prop, val, 'important') applies them
+    as inline !important, which always wins regardless of any stylesheet
+    specificity. A MutationObserver re-applies it if Streamlit re-renders
+    the container on rerun.
+    """
+    _components_html(
+        f"""
+        <script>
+        function ggCenterContainer() {{
+            const doc = window.parent.document;
+            const el = doc.querySelector('.st-key-{container_key}');
+            if (!el) return;
+            const props = {{
+                position: 'fixed', top: '0', left: '0', right: '0', bottom: '0',
+                width: '100vw', height: '100vh',
+                display: 'flex', 'align-items': 'center', 'justify-content': 'center',
+                margin: '0', padding: '40px', 'overflow-y': 'auto', 'z-index': '9999'
+            }};
+            for (const k in props) {{ el.style.setProperty(k, props[k], 'important'); }}
+        }}
+        ggCenterContainer();
+        setTimeout(ggCenterContainer, 50);
+        setTimeout(ggCenterContainer, 300);
+        const _gg_center_observer = new MutationObserver(ggCenterContainer);
+        _gg_center_observer.observe(window.parent.document.body, {{childList: true, subtree: true}});
+        window.parent.addEventListener('resize', ggCenterContainer);
+        </script>
+        """,
+        height=0,
+    )
+
+
 def render_logout_button():
     """Renders a small 'Log out' control for the sidebar footer — clears
     auth_status so the next rerun falls back to render_auth_page()."""
