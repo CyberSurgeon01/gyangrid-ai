@@ -1,331 +1,445 @@
 """
-Sign-up page for GyanGrid AI — redesigned auth experience.
+Sign-up page for GyanGrid AI.
 
-Same CSS strategy as login_page.py: st.markdown(unsafe_allow_html=True)
-injects global styles (not iframes), and we style Streamlit's own
-block-container to act as the centered white card.
+Renders the same centered auth card style as login_page.py, but for new
+account creation: email, password, confirm password, a sign-up button,
+social sign-up buttons with real Google/Apple marks, and a link back to
+Log In.
 
-Sets, on success:
-    st.session_state.auth_status = "user"
-    st.session_state.user_name / user_email
+--------------------------------------------------------------------------
+v2 audit / rebuild notes — kept in lockstep with login_page.py
+--------------------------------------------------------------------------
+Same 8px spacing scale and shared control tokens as the login page:
+  - CARD_MAX_WIDTH = 840px, CARD_PADDING = 56px 64px
+  - CONTROL_HEIGHT = 56px for every input AND every button
+  - RADIUS_CARD = 20px, RADIUS_CONTROL = 14px, RADIUS_PILL = 12px
 
-NOTE: UI + session-state only — wire up Supabase once ready.
+Fixes applied: vertical + horizontal centering of the card, unified
+input/button sizing (email, password, confirm-password, Sign Up, Google,
+Apple, Guest are all identical height/radius/typography), a balanced OR
+divider, room reserved for the native password reveal-icon on both
+password fields, and a footer where "Already have an account?" and the
+"Log In" button sit on one aligned line via st.columns instead of a tiny
+floating link.
+
+Note on approach: same as login_page.py — the card look is applied
+directly to Streamlit's own `div.block-container` rather than a separate
+opened/closed `<div>` via st.html, since st.html() renders each call as
+its own isolated element and doesn't actually nest later widgets inside
+it. The Google/Apple logos are drawn as CSS ::before backgrounds pinned
+onto each button by its Streamlit `key`, since st.button() only accepts
+a plain text label.
+
+Wiring notes:
+- On "Sign Up", this does placeholder validation (valid-ish email,
+  password length, passwords match) and then sets
+  st.session_state.auth_status = "user". Swap _validate_signup() out for
+  real account creation (Supabase, Firebase, etc.) when that's wired in.
+- "Continue with Google" / "Continue with Apple" are left as visual
+  placeholders (no OAuth wired yet), same as on the login page.
+- Clicking "Log In" sets auth_view -> "login" and reruns; app.py reads
+  st.session_state.auth_view to decide which page to show.
 """
 
+import base64
 import streamlit as st
-from src.ui_theme import icon_svg, theme_colors
+from src.ui_theme import theme_colors, icon_svg
+
+# ── Google "G" mark (official 4-colour logo) and Apple silhouette ───────
+# Kept as an identical copy of login_page.py's versions (rather than a
+# shared import) so this file can be styled independently if the two
+# pages ever diverge.
+_GOOGLE_G_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12
+c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24
+c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+<path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657
+C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+<path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36
+c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+<path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571
+c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+</svg>"""
+
+_APPLE_SILHOUETTE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="{color}">
+<path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03
+-.014-.11-.032-.23-.032-.36 0-1.09.55-2.2 1.19-2.98.7-.85 1.99-1.51 3.014-1.55.019.087.03.187.03.27z
+M20.929 17.14c-.06.13-.32.86-1.02 1.87-.61.89-1.28 1.87-2.14 1.87-.85 0-1.11-.51-2.06-.51-.98 0-1.29.51
+-2.08.51-.83 0-1.53-.94-2.14-1.83-1.6-2.3-2.82-6.5-1.18-9.34.81-1.4 2.28-2.28 3.85-2.31.86-.02 1.66.58
+2.19.58.51 0 1.5-.72 2.53-.61.43.02 1.65.17 2.43 1.31-.06.04-1.45.85-1.43 2.52.02 2 1.75 2.67 1.77 2.68
+-.02.06-.28.96-.94 1.9z"/>
+</svg>"""
 
 
-def _inject_signup_css(c: dict):
-    st.markdown(f"""
+def _data_uri(svg: str) -> str:
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode("utf-8")).decode("ascii")
+
+
+def _google_icon_uri() -> str:
+    return _data_uri(_GOOGLE_G_SVG)
+
+
+def _apple_icon_uri(color: str) -> str:
+    return _data_uri(_APPLE_SILHOUETTE_SVG.format(color=color))
+
+
+def _inject_auth_css():
+    c = theme_colors()
+    google_uri = _google_icon_uri()
+    apple_uri = _apple_icon_uri(c["text_primary"])
+
+    st.html(f"""
     <style>
-    /* ── Page background ───────────────────────────────────── */
-    html, body, .stApp,
+    /* ============================================================
+       LAYOUT: center the card horizontally AND vertically, and
+       kill Streamlit's default top/bottom dead-space.
+       ============================================================ */
     [data-testid="stAppViewContainer"],
     [data-testid="stAppViewContainer"] > .main {{
-        background: #F7F9FC !important;
+        min-height: 100vh;
     }}
-    [data-testid="stHeader"],
-    [data-testid="stToolbar"],
-    [data-testid="stSidebar"],
-    #MainMenu, footer {{ display: none !important; }}
-
-    /* ── Center the block container ─────────────────────────── */
-    [data-testid="stMainBlockContainer"],
-    .block-container {{
-        max-width: 420px !important;
-        margin: 0 auto !important;
-        padding: 48px 0 40px 0 !important;
-        background: transparent !important;
+    [data-testid="stMain"],
+    section.main {{
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
     }}
-
-    /* ── Auth card shell ────────────────────────────────────── */
-    .gg-auth-card-shell {{
-        background: #ffffff;
-        border: 1px solid #E2E8F0;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(15,23,42,.07), 0 0 1px rgba(15,23,42,.04);
-        padding: 36px 36px 30px 36px;
+    div.block-container {{
         width: 100%;
-        box-sizing: border-box;
+        max-width: 840px !important;
+        margin: 32px auto !important;
+        padding: 56px 64px !important;
+        background: {c['surface']};
+        border: 1px solid {c['border']};
+        border-radius: 20px;
+        box-shadow: 0 24px 56px rgba(15, 23, 42, 0.14);
     }}
 
-    /* ── Brand header ───────────────────────────────────────── */
-    .gg-auth-brand {{
-        display: flex; align-items: center;
-        justify-content: center; gap: 9px; margin-bottom: 3px;
+    /* ============================================================
+       TYPOGRAPHY HIERARCHY
+       ============================================================ */
+    .gg-auth-logo {{
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font-weight: 700;
+        font-size: 26px;
+        color: {c['text_primary']};
+        margin-bottom: 32px;
     }}
-    .gg-auth-brand-name {{
-        font-size: 22px; font-weight: 700;
-        color: {c['text_primary']}; letter-spacing: -.3px;
+    .gg-auth-title {{
+        text-align: center;
+        font-size: 40px;
+        font-weight: 700;
+        line-height: 1.25;
+        color: {c['text_primary']};
+        margin-bottom: 12px;
     }}
     .gg-auth-subtitle {{
-        text-align: center; color: {c['text_secondary']};
-        font-size: 13px; margin-bottom: 22px;
-    }}
-    .gg-auth-page-title {{
-        font-size: 19px; font-weight: 600;
-        color: {c['text_primary']}; margin-bottom: 18px;
-        letter-spacing: -.2px;
-    }}
-
-    /* ── Field labels ───────────────────────────────────────── */
-    .gg-field-label {{
-        display: block; font-size: 12.5px; font-weight: 500;
-        color: {c['text_primary']}; margin-bottom: 5px; margin-top: 12px;
-    }}
-    .gg-field-label:first-child {{ margin-top: 0; }}
-    .gg-pw-hint {{
-        font-size: 11.5px; color: #9CA3AF; margin-top: 3px; margin-bottom: 0;
+        text-align: center;
+        font-size: 19px;
+        color: {c['text_secondary']};
+        margin-bottom: 40px;
+        line-height: 1.55;
+        padding: 0 16px;
     }}
 
-    /* ── Streamlit input override ────────────────────────────── */
-    [data-testid="stTextInput"] > div > div {{
-        border: 1px solid #D1D5DB !important;
-        border-radius: 6px !important;
-        background: #ffffff !important;
-        box-shadow: none !important;
-        height: 40px !important;
-        transition: border-color .15s, box-shadow .15s !important;
-    }}
-    [data-testid="stTextInput"] > div > div:focus-within {{
-        border-color: {c['accent']} !important;
-        box-shadow: 0 0 0 3px rgba(37,99,235,.10) !important;
-    }}
-    [data-testid="stTextInput"] input {{
-        font-size: 13.5px !important;
-        color: {c['text_primary']} !important;
-        padding: 0 12px !important;
-        height: 38px !important;
-        background: transparent !important;
-    }}
-    [data-testid="stTextInput"] input::placeholder {{
-        color: #9CA3AF !important;
-    }}
-    [data-testid="stTextInput"] label {{ display: none !important; }}
-
-    /* ── Password row: input + eye toggle ────────────────────── */
-    .gg-pw-row [data-testid="stHorizontalBlock"] {{
-        gap: 0 !important;
-        align-items: flex-end !important;
-    }}
-    .gg-pw-row [data-testid="stHorizontalBlock"] > div:first-child
-        [data-testid="stTextInput"] > div > div {{
-        border-radius: 6px 0 0 6px !important;
-        border-right: none !important;
-    }}
-    .gg-pw-row [data-testid="stHorizontalBlock"] > div:last-child button {{
-        height: 40px !important;
-        width: 40px !important;
-        border: 1px solid #D1D5DB !important;
-        border-left: none !important;
-        border-radius: 0 6px 6px 0 !important;
-        background: #ffffff !important;
-        color: #6B7280 !important;
-        padding: 0 !important;
-        font-size: 18px !important;
-        box-shadow: none !important;
-        transition: background .12s, color .12s !important;
-        margin-top: 0 !important;
-    }}
-    .gg-pw-row [data-testid="stHorizontalBlock"] > div:last-child button:hover {{
-        background: #F9FAFB !important;
-        color: {c['text_primary']} !important;
-    }}
-
-    /* ── Primary submit button ────────────────────────────────── */
-    [data-testid="stFormSubmitButton"] > button,
-    div.stButton > button[kind="primary"] {{
-        background: {c['accent']} !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 6px !important;
-        font-size: 14px !important;
+    /* ============================================================
+       FORM FIELDS — identical width/height/radius across the board
+       ============================================================ */
+    label, .stTextInput label p, [data-testid="stWidgetLabel"] p {{
+        font-size: 16px !important;
         font-weight: 600 !important;
-        height: 42px !important;
-        width: 100% !important;
-        box-shadow: 0 1px 3px rgba(37,99,235,.22) !important;
-        transition: background .15s, box-shadow .15s !important;
-        margin-top: 10px !important;
+        color: {c['text_primary']};
+        margin-bottom: 6px !important;
     }}
-    [data-testid="stFormSubmitButton"] > button:hover,
-    div.stButton > button[kind="primary"]:hover {{
-        background: #1d4ed8 !important;
-        box-shadow: 0 3px 10px rgba(37,99,235,.30) !important;
+    div[data-testid="stTextInput"] {{
+        margin-bottom: 16px !important;
     }}
-
-    /* ── Secondary / outline buttons ──────────────────────────── */
-    div.stButton > button[kind="secondary"] {{
-        background: #ffffff !important;
-        color: {c['text_primary']} !important;
-        border: 1px solid #D1D5DB !important;
-        border-radius: 6px !important;
-        font-size: 13.5px !important;
-        font-weight: 500 !important;
-        height: 42px !important;
-        width: 100% !important;
+    div[data-testid="stTextInput"] > div {{
+        border-radius: 14px !important;
+        border: 1.5px solid {c['border']} !important;
+        background: {c['surface']} !important;
         box-shadow: none !important;
-        transition: border-color .15s, background .15s !important;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        position: relative !important;
+        display: flex;
+        align-items: center;
     }}
-    div.stButton > button[kind="secondary"]:hover {{
-        border-color: #9CA3AF !important;
-        background: #F9FAFB !important;
+    div[data-testid="stTextInput"] > div > div {{
+        border: none !important;
+        box-shadow: none !important;
+        width: 100%;
+    }}
+    div[data-testid="stTextInput"] > div:hover {{
+        border-color: color-mix(in srgb, {c['text_primary']} 35%, {c['border']}) !important;
+    }}
+    div[data-testid="stTextInput"] input {{
+        font-size: 18px !important;
+        height: 64px !important;
+        padding: 0 20px !important;
+        border-radius: 14px !important;
+        border: none !important;
+        box-shadow: none !important;
+        box-sizing: border-box;
+    }}
+    /* Leave clear room for Streamlit's native reveal-password icon on
+       both the password and confirm-password fields. */
+    div[data-testid="stTextInput"] input[type="password"] {{
+        padding-right: 56px !important;
+    }}
+    /* Reveal-password icon: anchor to the bordered box above (its nearest
+       positioned ancestor) so top:50% actually centers against the real
+       64px-tall field, instead of collapsing to the top edge. */
+    div[data-testid="stTextInput"] > div button {{
+        position: absolute !important;
+        right: 14px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        margin: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        width: auto !important;
+        padding: 4px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2;
+    }}
+    div[data-testid="stTextInput"] > div:focus-within {{
+        border-color: {c['accent']} !important;
+        box-shadow: 0 0 0 4px color-mix(in srgb, {c['accent']} 22%, transparent) !important;
     }}
 
-    /* ── Divider ─────────────────────────────────────────────── */
+    /* ============================================================
+       BUTTONS — every button (primary, social, guest) shares the
+       same height/radius/typography so nothing looks mismatched.
+       ============================================================ */
+    div.stButton {{ margin-bottom: 16px !important; }}
+    div.stButton > button, div.stDownloadButton > button {{
+        width: 100% !important;
+        height: 64px !important;
+        min-height: 64px !important;
+        font-size: 18px !important;
+        font-weight: 600 !important;
+        border-radius: 14px !important;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+    }}
+    div.stButton > button:hover {{
+        filter: brightness(0.97);
+    }}
+    div.stButton > button:active {{
+        transform: translateY(1px);
+    }}
+    div.stButton > button:focus-visible {{
+        outline: none !important;
+        box-shadow: 0 0 0 4px color-mix(in srgb, {c['accent']} 30%, transparent) !important;
+    }}
+
+    /* Primary "Sign Up" button gets a touch of elevation on hover to
+       read as the premium, primary call to action. */
+    .st-key-signup_submit button {{
+        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }}
+    .st-key-signup_submit button:hover {{
+        box-shadow: 0 8px 20px color-mix(in srgb, {c['accent']} 35%, transparent);
+    }}
+
+    /* Balanced OR divider */
     .gg-auth-divider {{
-        display: flex; align-items: center;
-        gap: 10px; margin: 14px 0;
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: {c['text_muted']};
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        margin: 32px 0;
     }}
-    .gg-div-line {{ flex: 1; height: 1px; background: #E5E7EB; }}
-    .gg-div-text {{ font-size: 12px; color: #9CA3AF; }}
+    .gg-auth-divider::before, .gg-auth-divider::after {{
+        content: "";
+        flex: 1;
+        border-bottom: 1px solid {c['border']};
+    }}
+    .gg-auth-divider:not(:empty)::before {{ margin-right: 12px; }}
+    .gg-auth-divider:not(:empty)::after {{ margin-left: 12px; }}
 
-    /* ── Switch-view footer ─────────────────────────────────── */
-    .gg-auth-switch {{
-        text-align: center; margin-top: 20px;
-        padding-top: 16px; border-top: 1px solid #F1F5F9;
-        font-size: 13px; color: {c['text_secondary']};
+    /* Social buttons: identical size, radius, spacing, icon alignment */
+    .st-key-signup_google button,
+    .st-key-signup_apple button,
+    .st-key-signup_guest button {{
+        position: relative !important;
+        background: {c['surface']} !important;
+        border: 1px solid {c['border']} !important;
+        color: {c['text_primary']} !important;
+    }}
+    .st-key-signup_google button::before,
+    .st-key-signup_apple button::before {{
+        content: "";
+        position: absolute;
+        left: 22px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 22px;
+        height: 22px;
+        background-repeat: no-repeat;
+        background-size: contain;
+    }}
+    .st-key-signup_google button::before {{
+        background-image: url("{google_uri}");
+    }}
+    .st-key-signup_apple button::before {{
+        background-color: {c['text_primary']};
+        -webkit-mask-image: url("{apple_uri}");
+        mask-image: url("{apple_uri}");
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
     }}
 
-    /* ── Form / layout cleanup ───────────────────────────────── */
-    [data-testid="stForm"] {{
-        border: none !important; padding: 0 !important;
+    /* ============================================================
+       FOOTER — text + inline "Log In" link on a single line via
+       st.columns(vertical_alignment="center"); columns are sized
+       tightly around their content (not 50/50) and the gap is
+       collapsed to ~4px so the link starts right after the "?".
+       ============================================================ */
+    .gg-auth-footer-row [data-testid="stHorizontalBlock"] {{
+        align-items: flex-end !important;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 32px;
+        width: fit-content !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }}
+    .gg-auth-footer-row [data-testid="stHorizontalBlock"] > div[data-testid="column"] {{
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }}
+    .gg-auth-footer-text {{
+        font-size: 17px;
+        line-height: 1;
+        color: {c['text_secondary']};
+        text-align: right;
+        white-space: nowrap;
+        margin: 0;
+        padding-bottom: 2px;
+    }}
+    /* Plain text link: no border, no background, no box — only the
+       "Log In" label itself is clickable. Selector specificity is
+       intentionally boosted (repeated class + attribute) so this beats
+       Streamlit's own default secondary-button border, which otherwise
+       has equal-or-higher specificity than a single class selector. */
+    div.stButton.st-key-signup_goto_login button,
+    .st-key-signup_goto_login button[kind] {{
+        height: auto !important;
+        min-height: 0 !important;
+        padding: 0 !important;
+        padding-bottom: 2px !important;
+        width: auto !important;
+        font-size: 17px !important;
+        font-weight: 600 !important;
+        border-radius: 0 !important;
         background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        color: {c['accent']} !important;
+        border: 0 !important;
+        border-width: 0 !important;
+        border-style: none !important;
+        border-color: transparent !important;
         box-shadow: none !important;
+        outline: none !important;
+        text-decoration: underline;
+        line-height: 1;
     }}
-    .gg-pw-row [data-testid="column"] {{
-        padding: 0 !important; gap: 0 !important;
+    div.stButton.st-key-signup_goto_login button:hover,
+    .st-key-signup_goto_login button[kind]:hover {{
+        filter: brightness(0.9);
+        box-shadow: none !important;
+        border: 0 !important;
     }}
-    [data-testid="stVerticalBlock"] > div {{ gap: 0 !important; }}
-    [data-testid="stAlert"] {{
-        border-radius: 6px !important;
-        font-size: 13.5px !important;
-        margin-bottom: 10px !important;
-        margin-top: 4px !important;
+    .st-key-signup_goto_login button:focus-visible {{
+        box-shadow: 0 0 0 3px color-mix(in srgb, {c['accent']} 30%, transparent) !important;
+        border-radius: 4px !important;
+    }}
+    .st-key-signup_goto_login {{
+        display: flex;
+        justify-content: flex-start;
     }}
 
-    @media (max-width: 460px) {{
-        .gg-auth-card-shell {{ padding: 28px 18px 24px 18px; border-radius: 6px; }}
-        [data-testid="stMainBlockContainer"], .block-container {{
-            padding: 24px 16px 32px 16px !important;
-        }}
+    [data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentError"] p {{
+        font-size: 16px !important;
     }}
     </style>
-    """, unsafe_allow_html=True)
+    """)
+
+
+def _validate_signup(email: str, password: str, confirm: str) -> str | None:
+    """Placeholder sign-up validation. Returns an error message, or None
+    if everything looks acceptable. Replace with real account creation
+    (and server-side validation) later."""
+    if not email or "@" not in email:
+        return "Please enter a valid email address."
+    if len(password) < 8:
+        return "Password must be at least 8 characters."
+    if password != confirm:
+        return "Passwords do not match."
+    return None
 
 
 def render_signup_page():
     c = theme_colors()
-    _inject_signup_css(c)
+    _inject_auth_css()
 
-    if "signup_show_pw" not in st.session_state:
-        st.session_state.signup_show_pw = False
-    if "signup_show_confirm" not in st.session_state:
-        st.session_state.signup_show_confirm = False
+    st.html(f"""
+    <div class="gg-auth-logo">{icon_svg('brain', 28, c['accent'])}GyanGrid AI</div>
+    <div class="gg-auth-title">Create your account</div>
+    <div class="gg-auth-subtitle">Sign up to start uploading papers and getting AI-powered research insights.</div>
+    """)
 
-    brain_svg = icon_svg("brain", 26, c["accent"])
+    email = st.text_input("Email", placeholder="you@example.com", key="signup_email")
+    password = st.text_input(
+        "Password", placeholder="Create a password", type="password", key="signup_password"
+    )
+    confirm = st.text_input(
+        "Confirm Password", placeholder="Re-enter your password", type="password", key="signup_confirm"
+    )
 
-    # ── Card open ──────────────────────────────────────────────
-    st.markdown('<div class="gg-auth-card-shell">', unsafe_allow_html=True)
-
-    st.markdown(f"""
-        <div class="gg-auth-brand">
-            {brain_svg}
-            <span class="gg-auth-brand-name">GyanGrid AI</span>
-        </div>
-        <div class="gg-auth-subtitle">AI Research Assistant</div>
-        <div class="gg-auth-page-title">Create your account</div>
-    """, unsafe_allow_html=True)
-
-    # ── Signup form ────────────────────────────────────────────
-    with st.form("gg_signup_form", border=False):
-        st.markdown('<span class="gg-field-label">Full name</span>', unsafe_allow_html=True)
-        name = st.text_input(
-            "Full name", key="signup_name",
-            placeholder="Your name", label_visibility="collapsed"
-        )
-
-        st.markdown('<span class="gg-field-label">Email</span>', unsafe_allow_html=True)
-        email = st.text_input(
-            "Email", key="signup_email",
-            placeholder="you@example.com", label_visibility="collapsed"
-        )
-
-        st.markdown('<span class="gg-field-label">Password</span>', unsafe_allow_html=True)
-        pw_type = "text" if st.session_state.signup_show_pw else "password"
-        st.markdown('<div class="gg-pw-row">', unsafe_allow_html=True)
-        pw_col, eye_col = st.columns([9, 1], gap="small")
-        with pw_col:
-            password = st.text_input(
-                "Password", key="signup_password", type=pw_type,
-                placeholder="••••••••", label_visibility="collapsed"
-            )
-        with eye_col:
-            eye1 = "🙈" if st.session_state.signup_show_pw else "👁"
-            if st.form_submit_button(eye1):
-                st.session_state.signup_show_pw = not st.session_state.signup_show_pw
-                st.rerun()
-        st.markdown('</div><p class="gg-pw-hint">Minimum 6 characters.</p>',
-                    unsafe_allow_html=True)
-
-        st.markdown('<span class="gg-field-label">Confirm password</span>',
-                    unsafe_allow_html=True)
-        cpw_type = "text" if st.session_state.signup_show_confirm else "password"
-        st.markdown('<div class="gg-pw-row">', unsafe_allow_html=True)
-        cpw_col, ceye_col = st.columns([9, 1], gap="small")
-        with cpw_col:
-            confirm = st.text_input(
-                "Confirm password", key="signup_confirm", type=cpw_type,
-                placeholder="••••••••", label_visibility="collapsed"
-            )
-        with ceye_col:
-            eye2 = "🙈" if st.session_state.signup_show_confirm else "👁"
-            if st.form_submit_button(eye2):
-                st.session_state.signup_show_confirm = not st.session_state.signup_show_confirm
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        submitted = st.form_submit_button(
-            "Create account", use_container_width=True, type="primary"
-        )
-
-    if submitted:
-        if not name or not email or not password:
-            st.error("Please fill in all fields.")
-        elif password != confirm:
-            st.error("Passwords don't match.")
-        elif len(password) < 6:
-            st.error("Password must be at least 6 characters.")
+    if st.button("Sign Up", type="primary", use_container_width=True, key="signup_submit"):
+        error = _validate_signup(email, password, confirm)
+        if error:
+            st.error(error)
         else:
-            # TODO: replace with real Supabase auth.sign_up()
             st.session_state.auth_status = "user"
             st.session_state.user_email = email
-            st.session_state.user_name = name
             st.rerun()
 
-    # ── Divider ──────────────────────────────────────────────
-    st.markdown("""
-        <div class="gg-auth-divider">
-            <div class="gg-div-line"></div>
-            <span class="gg-div-text">or</span>
-            <div class="gg-div-line"></div>
-        </div>
-    """, unsafe_allow_html=True)
+    st.html('<div class="gg-auth-divider">OR</div>')
 
-    # ── Google ────────────────────────────────────────────────
-    if st.button("🔵  Continue with Google", key="signup_google_btn",
-                 use_container_width=True):
-        if "auth" in st.secrets:
-            st.login()
-        else:
-            st.info("Google login isn't configured yet — add [auth] to .streamlit/secrets.toml.")
-
-    # ── Switch to login ───────────────────────────────────────
-    st.markdown('<div class="gg-auth-switch">Already have an account?</div>',
-                unsafe_allow_html=True)
-    if st.button("Log in →", key="go_to_login_btn", use_container_width=True):
-        st.session_state.auth_view = "login"
+    if st.button("Continue with Google", use_container_width=True, key="signup_google"):
+        st.info("Google sign-up isn't connected yet — coming soon.")
+    if st.button("Continue with Apple", use_container_width=True, key="signup_apple"):
+        st.info("Apple sign-up isn't connected yet — coming soon.")
+    if st.button("Continue as Guest", use_container_width=True, key="signup_guest"):
+        st.session_state.auth_status = "guest"
         st.rerun()
 
-    # ── Card close ────────────────────────────────────────────
-    st.markdown('</div>', unsafe_allow_html=True)
+    st.html('<div class="gg-auth-footer-row">')
+    col_text, col_btn = st.columns([1, 1], gap="small", vertical_alignment="center")
+    with col_text:
+        st.html('<p class="gg-auth-footer-text">Already have an account?</p>')
+    with col_btn:
+        if st.button("Log In", key="signup_goto_login", use_container_width=False):
+            st.session_state.auth_view = "login"
+            st.rerun()
