@@ -14,6 +14,7 @@ from src.audio_player import render_audio_player
 from src.login_page import render_login_page
 from src.signup_page import render_signup_page
 from src.supabase_client import get_supabase
+from src.profile import render_profile_menu, register_paper, get_current_user_id
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
@@ -122,6 +123,7 @@ _PAGE_COPY = {
     "Settings": ("Settings", "Configure output language and workspace preferences."),
 }
 _title, _subtitle = _PAGE_COPY.get(page, ("GyanGrid AI", ""))
+render_profile_menu()
 page_header(
     _title,
     _subtitle,
@@ -161,6 +163,7 @@ def process_uploaded_file(uploaded_file):
             st.session_state.last_analysis = cached_analysis["analysis"]
             st.session_state.last_analysis_lang = cached_analysis["lang_code"]
 
+        register_paper(get_current_user_id(), file_hash, data["file_name"])
         st.session_state.pop(f"audio_paper_{uploaded_file.name}", None)
         st.session_state.pop("audio_analysis", None)
         return
@@ -193,6 +196,7 @@ def process_uploaded_file(uploaded_file):
         store.add_chunks(embedded_chunks)
 
     save_paper(file_hash, uploaded_file.name, cleaned_text, chunks, parsed, section_chunks, store)
+    register_paper(get_current_user_id(), file_hash, uploaded_file.name)
 
     st.session_state.processed_file_name = uploaded_file.name
     st.session_state.cleaned_text = cleaned_text
