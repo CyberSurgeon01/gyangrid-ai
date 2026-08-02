@@ -183,10 +183,7 @@ def _initials(name: str, email: str) -> str:
     source = name.strip() if name and name.strip() else email
     if not source:
         return "?"
-    parts = [p for p in source.replace("@", " ").split() if p]
-    if len(parts) >= 2:
-        return (parts[0][0] + parts[1][0]).upper()
-    return source[:2].upper()
+    return source[0].upper()
 
 
 def update_display_name(new_name: str) -> tuple:
@@ -245,7 +242,7 @@ def render_profile_menu():
 
     spacer, menu_col = st.columns([14, 1])
     with menu_col:
-        with st.popover(initials, use_container_width=True):
+        with st.popover(initials, use_container_width=False):
             st.markdown(f"**{user['name'] or 'Unnamed user'}**")
             st.caption(user["email"] or "Not signed in")
             st.caption("Personal account")

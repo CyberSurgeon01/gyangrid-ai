@@ -343,22 +343,52 @@ def inject_base_css():
             font-size: 14px;
         }}
 
-        /* Profile menu trigger button (the avatar/initials pill, top right).
-           st.popover()'s own trigger button ignores our theme by default and
-           renders as a plain white pill — this brings it in line. */
+        /* Profile avatar button — solid accent circle, no chevron. */
         div[data-testid="stPopover"] > div > button {{
-            background: {c['surface']} !important;
-            border: 1px solid {c['border']} !important;
-            color: {c['text_primary']} !important;
+            background: {c['accent']} !important;
+            border: none !important;
             border-radius: 50% !important;
             width: 40px !important;
             height: 40px !important;
+            min-height: 40px !important;
             padding: 0 !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
+            font-size: 14px !important;
+            color: #ffffff !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.35) !important;
+            transition: box-shadow 0.15s ease, transform 0.15s ease !important;
+            overflow: visible !important;
+            position: relative !important;
         }}
         div[data-testid="stPopover"] > div > button:hover {{
-            border-color: {c['accent']} !important;
-            color: {c['accent']} !important;
+            box-shadow: 0 4px 16px rgba(37,99,235,0.5) !important;
+            transform: scale(1.06) !important;
+        }}
+        div[data-testid="stPopover"] > div > button p {{
+            color: #ffffff !important;
+            font-weight: 700 !important;
+            font-size: 16px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 40px !important;
+            text-align: center !important;
+            width: 40px !important;
+            height: 40px !important;
+            display: block !important;
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+        }}
+        div[data-testid="stPopover"] > div > button svg,
+        div[data-testid="stPopover"] > div > button svg *,
+        div[data-testid="stPopover"] button [data-testid="stPopoverTriggerChevron"],
+        div[data-testid="stPopover"] button > *:not(p) {{
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
         }}
 
         /* Profile popover panel — matches the active theme (card
@@ -1020,6 +1050,33 @@ def inject_base_css():
     _components_html(
         """
         <script>
+        (function removePopoverChevron() {
+            const doc = window.parent.document;
+            function strip() {
+                doc.querySelectorAll(
+                    '[data-testid="stPopover"] button svg, ' +
+                    '[data-testid="stPopover"] button [data-testid*="chevron"], ' +
+                    '[data-testid="stPopover"] button [data-testid*="Chevron"]'
+                ).forEach(el => el.remove());
+                doc.querySelectorAll('[data-testid="stPopover"] > div > button').forEach(btn => {
+                    btn.style.setProperty('display', 'flex', 'important');
+                    btn.style.setProperty('align-items', 'center', 'important');
+                    btn.style.setProperty('justify-content', 'center', 'important');
+                    // grab text from p, clear all children, inject a centered span
+                    const p = btn.querySelector('p');
+                    const letter = p ? p.textContent.trim()[0] : '';
+                    if (letter) {
+                        btn.innerHTML = '';
+                        const span = doc.createElement('span');
+                        span.textContent = letter;
+                        span.style.cssText = 'color:#fff;font-weight:700;font-size:15px;line-height:1;pointer-events:none;';
+                        btn.appendChild(span);
+                    }
+                });
+            }
+            strip();
+            new MutationObserver(strip).observe(doc.body, {childList: true, subtree: true});
+        })();
         function stripUploaderTitles() {
             const doc = window.parent.document;
             doc.querySelectorAll(
