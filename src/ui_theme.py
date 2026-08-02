@@ -282,6 +282,7 @@ def inject_base_css():
     """Injects the global stylesheet. Call once, near the top of app.py."""
     c = _colors()
     is_dark = st.session_state.get("dark_mode", False)
+    popover_text = "#FFFFFF" if is_dark else c["text_primary"]
     
     dark_extra = f"""
         .gg-card {{
@@ -359,8 +360,11 @@ def inject_base_css():
             color: {c['accent']} !important;
         }}
 
-        /* Profile popover panel — full dark theme to match the rest of
-           the app (card background, text, tabs, dividers, inputs). */
+        /* Profile popover panel — matches the active theme (card
+           background, text, tabs, dividers, inputs). Text is forced to
+           sharp white in dark mode, and the normal dark text color in
+           light mode — hardcoding white here would make text invisible
+           against the light-mode surface. */
         div[data-testid="stPopoverBody"],
         div[data-testid="stPopoverBody"] > div,
         div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"],
@@ -380,26 +384,26 @@ def inject_base_css():
         div[data-testid="stPopoverBody"] label,
         div[data-testid="stPopoverBody"] [data-testid="stMarkdownContainer"],
         div[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] {{
-            color: #FFFFFF !important;
+            color: {popover_text} !important;
         }}
         div[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] p {{
-            color: #FFFFFF !important;
+            color: {popover_text} !important;
             opacity: 1 !important;
         }}
         div[data-testid="stPopoverBody"] a,
         div[data-testid="stPopoverBody"] a:visited {{
-            color: #FFFFFF !important;
+            color: {popover_text} !important;
             text-decoration: underline;
         }}
         div[data-testid="stPopoverBody"] hr {{
             border-color: {c['border']} !important;
         }}
         div[data-testid="stPopoverBody"] [data-testid="stTabs"] button {{
-            color: #FFFFFF !important;
+            color: {popover_text} !important;
             opacity: 0.7;
         }}
         div[data-testid="stPopoverBody"] [data-testid="stTabs"] button[aria-selected="true"] {{
-            color: #FFFFFF !important;
+            color: {popover_text} !important;
             opacity: 1;
         }}
         div[data-testid="stPopoverBody"] div[data-testid="stTextInput"] > div {{

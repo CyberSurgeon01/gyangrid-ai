@@ -35,6 +35,7 @@ from src.ui_theme import (
     feature_preview_card,
     history_table,
     json_block,
+    theme_colors,
 )
 
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
@@ -707,8 +708,9 @@ if page == "Citation graph":
             st.info("No citations could be matched in this paper yet.")
         else:
             try:
-                from streamlit_agraph import agraph, Node, Edge, Config
+                from pyvis.network import Network
 
+                c = theme_colors()
                 section_colors = {}
                 palette = ["#6C8EF5", "#1D9E75", "#D85A30", "#D4537E", "#BA7517", "#7F77DD"]
 
@@ -720,61 +722,54 @@ if page == "Citation graph":
                 def _truncate_label(label, max_chars=18):
                     return label if len(label) <= max_chars else label[: max_chars - 1] + "…"
 
-                agraph_nodes = []
+                num_ref_nodes = max(len(graph["nodes"]) - 1, 1)
+                canvas_height = min(900, max(560, 60 + num_ref_nodes * 34))
+
+                net = Network(
+                    height=f"{canvas_height}px",
+                    width="100%",
+                    bgcolor=c["surface"],
+                    font_color=c["text_primary"],
+                    directed=True,
+                    cdn_resources="in_line",  # embed JS/CSS so it works offline too
+                )
+                net.barnes_hut(
+                    gravity=-6000, central_gravity=0.3,
+                    spring_length=180, spring_strength=0.04,
+                )
+
                 for n in graph["nodes"]:
                     if n["type"] == "paper":
-                        agraph_nodes.append(
-                            Node(
-                                id=n["id"],
-                                label=_truncate_label(n["label"], max_chars=20),
-                                title=n["label"],
-                                size=30,
-                                color="#2C2C2A",
-                                shape="dot",
-                                font={"size": 14, "color": "#ffffff", "strokeWidth": 0},
-                            )
+                        net.add_node(
+                            n["id"],
+                            label=_truncate_label(n["label"], max_chars=20),
+                            title=n["label"],
+                            size=30,
+                            color="#2C2C2A",
+                            shape="dot",
+                            font={"size": 14, "color": c["text_primary"]},
                         )
                     else:
                         weight = n["times_cited"] or 0
-                        agraph_nodes.append(
-                            Node(
-                                id=n["id"],
-                                label=_truncate_label(n["label"]),
-                                title=f"{n['label']} — cited {weight}x",
-                                size=10 + min(weight, 6) * 2,
-                                color="#378ADD",
-                                shape="dot",
-                                font={"size": 11, "color": "#1a1d24", "strokeWidth": 3, "strokeColor": "#ffffff"},
-                            )
+                        net.add_node(
+                            n["id"],
+                            label=_truncate_label(n["label"]),
+                            title=f"{n['label']} — cited {weight}x",
+                            size=10 + min(weight, 6) * 2,
+                            color="#378ADD",
+                            shape="dot",
+                            font={"size": 11, "color": c["text_primary"]},
                         )
 
-                agraph_edges = [
-                    Edge(
-                        source=e["source"],
-                        target=e["target"],
-                        color=_color_for_section(e["section"]),
-                    )
-                    for e in graph["edges"]
-                    if e["weight"] > 0
-                ]
+                for e in graph["edges"]:
+                    if e["weight"] > 0:
+                        net.add_edge(
+                            e["source"], e["target"],
+                            color=_color_for_section(e["section"]),
+                        )
 
-                num_ref_nodes = max(len(agraph_nodes) - 1, 1)
-                canvas_height = min(900, max(560, 60 + num_ref_nodes * 34))
-
-                config = Config(
-                    width="100%",
-                    height=canvas_height,
-                    directed=True,
-                    physics=True,
-                    hierarchical=False,
-                    collapsible=False,
-                    nodeHighlightBehavior=True,
-                    highlightColor="#F2A623",
-                    node={"labelProperty": "label"},
-                    link={"renderLabel": False},
-                    d3={"gravity": -600, "linkLength": 180, "linkStrength": 0.4},
-                )
-                agraph(nodes=agraph_nodes, edges=agraph_edges, config=config)
+                graph_html = net.generate_html(notebook=False)
+                st.components.v1.html(graph_html, height=canvas_height + 20, scrolling=True)
                 st.caption("Hover a node to see its full title. Drag nodes to spread them out further.")
 
                 if section_colors:
@@ -784,8 +779,8 @@ if page == "Citation graph":
                     )
             except ImportError:
                 st.warning(
-                    "The interactive graph view needs the `streamlit-agraph` package "
-                    "(add it to requirements.txt: `streamlit-agraph`). Showing a plain "
+                    "The interactive graph view needs the `pyvis` package "
+                    "(add it to requirements.txt: `pyvis`). Showing a plain "
                     "ranked list instead."
                 )
                 top_refs = most_cited_references(graph, top_n=10)
@@ -800,12 +795,25 @@ if page == "Citation graph":
             )
             year_dist = reference_year_distribution(graph)
             if year_dist:
-                import pandas as pd
+                import plotly.graph_objects as go
 
-                year_df = pd.DataFrame(
-                    {"Year": list(year_dist.keys()), "References": list(year_dist.values())}
-                ).set_index("Year")
-                st.bar_chart(year_df, color="#378ADD")
+                c = theme_colors()
+                years = list(year_dist.keys())
+                counts = list(year_dist.values())
+
+                fig = go.Figure(
+                    go.Bar(x=years, y=counts, marker_color="#378ADD")
+                )
+                fig.update_layout(
+                    paper_bgcolor=c["surface"],
+                    plot_bgcolor=c["surface"],
+                    font_color=c["text_primary"],
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    height=320,
+                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                )
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
                 if "unknown" in year_dist:
                     st.caption(
                         f"{year_dist['unknown']} reference(s) had no detectable publication year."
