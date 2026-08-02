@@ -1018,6 +1018,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
         ("AI Tools", [
             ("message-question", "Q&A (RAG)"),
             ("sparkles", "AI analysis"),
+            ("layers", "Compare"),
             ("quote", "Citation graph"),
         ]),
         ("System", [

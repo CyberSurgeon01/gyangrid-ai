@@ -1,8 +1,10 @@
-from src.llm_pipeline import answer_question, _expand_query, classify_is_research_paper
-from src.background_analysis import start_analysis, get_analysis_status, clear_analysis
+from src.llm_pipeline import answer_question, _expand_query, classify_is_research_paper, extract_retry_seconds, is_zero_quota_exception
+from src.background_analysis import get_analysis_status
 from src.paper_validator import is_research_paper
 from src.report_export import generate_docx_report, generate_pdf_report
 from src.citation_graph import build_citation_graph, most_cited_references, reference_year_distribution
+import time
+from datetime import datetime, timezone
 import streamlit as st
 from src.document_loader import load_document
 from src.text_cleaner import clean_text
@@ -16,6 +18,7 @@ from src.login_page import render_login_page
 from src.signup_page import render_signup_page
 from src.supabase_client import get_supabase
 from src.profile import render_profile_menu, register_paper, get_current_user_id, list_papers, open_paper
+from src.compare_page import render_compare_page
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
@@ -41,11 +44,27 @@ def _is_quota_error(e: Exception) -> bool:
     return "429" in msg or "resource_exhausted" in msg or "quota" in msg
 
 
-def _quota_warning():
-    st.warning(
-        "Gemini API quota reached. This resets every minute — wait a moment and try again.",
-        icon="⏳",
-    )
+def _quota_warning(e: Exception = None):
+    if e is not None and is_zero_quota_exception(e):
+        st.error(
+            "This Gemini API key has **no quota at all** (limit: 0) for this "
+            "model — that's not a temporary traffic spike, it's a billing/plan "
+            "issue, so retrying won't help. Check "
+            "[Gemini API rate limits](https://ai.google.dev/gemini-api/docs/rate-limits) "
+            "and make sure billing is enabled on the linked Google Cloud project.",
+            icon="🚫",
+        )
+    else:
+        wait_s = extract_retry_seconds(e) if e is not None else None
+        if wait_s:
+            wait_str = f"{int(wait_s)} seconds" if wait_s < 90 else f"{int(wait_s // 60)} minutes"
+            msg = f"We're processing a lot of requests right now and hit our limit. Please try again in about {wait_str}."
+        else:
+            msg = "We're processing a lot of requests right now and hit our limit. Please try again shortly."
+        st.warning(msg, icon="⏳")
+    if e is not None:
+        with st.expander("Show raw error (source material)"):
+            st.code(str(e), language=None)
 
 # ── Restore dark-mode preference after a page refresh ───────────────────
 # st.session_state resets on refresh (new browser session), but
@@ -133,6 +152,7 @@ _PAGE_COPY = {
     "History": ("History", "All papers you've uploaded — open any of them to pick up right where you left off."),
     "Q&A (RAG)": ("Q&A (RAG)", "Ask grounded questions and get answers sourced directly from the paper."),
     "AI analysis": ("AI Analysis", "Upload a research paper to generate summaries, insights, questions, and citation support."),
+    "Compare": ("Compare", "Compare sections between two research papers side by side."),
     "Citation graph": ("Citation graph", "Visualize how this paper's citations map to its reference list."),
     "Settings": ("Settings", "Configure output language and workspace preferences."),
 }
@@ -423,7 +443,7 @@ if page == "Q&A (RAG)":
                         st.write(answer)
                     except Exception as e:
                         if _is_quota_error(e):
-                            _quota_warning()
+                            _quota_warning(e)
                         else:
                             st.error(f"Could not generate an answer: {e}")
 
@@ -519,104 +539,85 @@ if page == "AI analysis":
         card_open(
             "Full AI analysis",
             "sparkles",
-            caption="Analysis runs in the background — feel free to browse other pages.",
+            caption="Analysis runs inline and finishes before the page continues.",
         )
         word_limit = st.slider("Conclusion summary word limit", min_value=50, max_value=300, value=120)
 
-        # Poll current status from Supabase (or None for guests/no run yet)
-        status_row = None if is_guest else get_analysis_status(user_id, file_hash)
-        current_status = status_row["status"] if status_row else None
+        # Previously-saved result (if any) — used only to decide the
+        # button label ("Generate" vs "Re-run"). No background polling:
+        # analysis now runs synchronously, so there's no in-between state
+        # to track.
+        saved_status_row = None if is_guest else get_analysis_status(user_id, file_hash)
+        has_saved_result = bool(saved_status_row and saved_status_row.get("result"))
 
-        col_btn, col_rerun = st.columns([2, 1])
-        with col_btn:
-            btn_label = "Re-run AI analysis" if current_status == "done" else "Generate AI analysis"
-            if st.button(btn_label, type="primary", key="ai_generate_btn"):
-                if is_guest:
-                    # Guests: run inline (no background, no save)
-                    with st.spinner("Brewing insights from your paper..."):
-                        try:
-                            from src.llm_pipeline import analyze_paper
-                            novelty_chunks = store.search(embed_query("novelty original contribution of this paper"), top_k=5)
-                            gap_chunks = store.search(embed_query("research gap limitation prior work"), top_k=5)
-                            future_chunks = store.search(embed_query("future work directions recommendations"), top_k=5)
-                            general_chunks = [
-                                {"section": "title", "text": parsed["title"]},
-                                {"section": "abstract", "text": parsed["abstract"][:1000]},
-                            ]
-                            analysis = analyze_paper(
-                                {"novelty": novelty_chunks, "research_gap": gap_chunks,
-                                 "future_work": future_chunks, "general": general_chunks},
-                                language=lang_code, word_limit=word_limit,
-                            )
-                            st.session_state.last_analysis = analysis
-                            st.session_state.last_analysis_lang = lang_code
-                            st.session_state.pop("audio_analysis", None)
-                        except Exception as e:
-                            if _is_quota_error(e):
-                                _quota_warning()
-                            else:
-                                st.error(f"Analysis failed: {e}")
-                else:
-                    # Clear previous row so user can re-run
-                    if current_status in ("done", "error"):
-                        clear_analysis(user_id, file_hash)
+        # Restore a previously-completed analysis after a refresh, even if
+        # the disk cache (loaded near the top of this file) missed it.
+        if has_saved_result and "last_analysis" not in st.session_state:
+            st.session_state.last_analysis = saved_status_row["result"]
+            st.session_state.last_analysis_lang = saved_status_row.get("lang_code", "en")
+            st.session_state.last_analysis_hash = file_hash
 
-                    with st.spinner("Retrieving relevant chunks..."):
-                        novelty_chunks = store.search(embed_query("novelty original contribution of this paper"), top_k=5)
-                        gap_chunks = store.search(embed_query("research gap limitation prior work"), top_k=5)
-                        future_chunks = store.search(embed_query("future work directions recommendations"), top_k=5)
-                        general_chunks = [
-                            {"section": "title", "text": parsed["title"]},
-                            {"section": "abstract", "text": parsed["abstract"][:1000]},
-                        ]
-                        chunks_by_type = {
-                            "novelty": novelty_chunks,
-                            "research_gap": gap_chunks,
-                            "future_work": future_chunks,
-                            "general": general_chunks,
-                        }
+        btn_label = "Re-run AI analysis" if has_saved_result else "Generate AI analysis"
+        if st.button(btn_label, type="primary", key="ai_generate_btn"):
+            # Clear any previous results first — if THIS attempt fails, we
+            # don't want stale results from an earlier run rendering below
+            # the error, which makes the error look bogus/contradictory.
+            st.session_state.pop("last_analysis", None)
+            st.session_state.pop("last_analysis_lang", None)
+            st.session_state.pop("last_analysis_hash", None)
+            st.session_state.pop("audio_analysis", None)
 
-                    started = start_analysis(
-                        user_id=user_id,
-                        file_hash=file_hash,
-                        file_name=st.session_state.get("processed_file_name", ""),
-                        chunks_by_type=chunks_by_type,
-                        lang_code=lang_code,
-                        word_limit=word_limit,
+            with st.spinner("Brewing insights from your paper..."):
+                try:
+                    from src.llm_pipeline import analyze_paper
+                    novelty_chunks = store.search(embed_query("novelty original contribution of this paper"), top_k=5)
+                    gap_chunks = store.search(embed_query("research gap limitation prior work"), top_k=5)
+                    future_chunks = store.search(embed_query("future work directions recommendations"), top_k=5)
+                    general_chunks = [
+                        {"section": "title", "text": parsed["title"]},
+                        {"section": "abstract", "text": parsed["abstract"][:1000]},
+                    ]
+                    analysis = analyze_paper(
+                        {"novelty": novelty_chunks, "research_gap": gap_chunks,
+                         "future_work": future_chunks, "general": general_chunks},
+                        language=lang_code, word_limit=word_limit,
                     )
-                    if started:
-                        st.toast("Analysis started in background! Browse other pages freely.", icon="🚀")
-                    st.rerun()
+                    st.session_state.last_analysis = analysis
+                    st.session_state.last_analysis_lang = lang_code
+                    st.session_state.last_analysis_hash = file_hash
+                    st.session_state.pop("audio_analysis", None)
 
-        with col_rerun:
-            if current_status in ("pending", "running"):
-                if st.button("🔄 Refresh status", key="ai_refresh_btn", use_container_width=True):
-                    st.rerun()
+                    if not is_guest:
+                        # Persist for History / page-refresh restore. This
+                        # runs in the main Streamlit thread — no threading
+                        # involved, so no ScriptRunContext issues, no stuck
+                        # 'pending' rows possible.
+                        try:
+                            from src.background_analysis import _upsert_row
+                            from src.supabase_client import get_supabase
+                            _upsert_row(
+                                get_supabase(), user_id, file_hash,
+                                status="done", result=analysis,
+                                lang_code=lang_code,
+                                file_name=st.session_state.get("processed_file_name", ""),
+                            )
+                        except Exception:
+                            pass  # non-fatal — result still shows this session
+                        try:
+                            from src.paper_cache import save_analysis
+                            save_analysis(file_hash, analysis, lang_code)
+                        except Exception:
+                            pass
+
+                except Exception as e:
+                    if _is_quota_error(e):
+                        _quota_warning(e)
+                    else:
+                        st.error(f"Analysis failed: {e}")
 
         card_close()
 
-        # ── Status display ───────────────────────────────────────────────
-        if not is_guest and current_status in ("pending", "running"):
-            card_open("Analysis in progress", "sparkles")
-            st.info("⏳ Analysis is running in the background. You can browse other pages and come back here anytime.", icon="🔄")
-            st.caption("Click 'Refresh status' to check if it's done.")
-            card_close()
 
-        elif not is_guest and current_status == "error":
-            card_open("Analysis failed", "alert-triangle")
-            st.error(f"Something went wrong: {status_row.get('error_msg', 'Unknown error')}")
-            st.caption("Click 'Generate AI analysis' to try again.")
-            card_close()
-
-        elif not is_guest and current_status == "done" and status_row.get("result"):
-            # Load result from Supabase into session_state
-            if st.session_state.get("last_analysis_hash") != file_hash:
-                st.session_state.last_analysis = status_row["result"]
-                st.session_state.last_analysis_lang = status_row.get("lang_code", "en")
-                st.session_state.last_analysis_hash = file_hash
-                st.session_state.pop("audio_analysis", None)
-
-        # ── Render results (works for both guest inline and bg done) ─────
         if "last_analysis" in st.session_state:
             analysis = st.session_state.last_analysis
             paper_title = parsed.get("title") or "Research Paper Analysis"
@@ -683,6 +684,14 @@ if page == "AI analysis":
                     use_container_width=True,
                 )
             card_close()
+
+# ── Compare page ─────────────────────────────────────────────────────────
+# No require_document() gate here — Compare works off saved History, not
+# the currently-loaded paper. Guest handling (no saved papers) lives
+# inside render_compare_page() itself, since the exact "log back in"
+# behavior is specific to that page.
+if page == "Compare":
+    render_compare_page()
 
 # ── Citation graph page ─────────────────────────────────────────────────
 if page == "Citation graph":
