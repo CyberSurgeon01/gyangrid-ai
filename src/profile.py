@@ -154,6 +154,18 @@ def open_paper(file_hash: str) -> bool:
 def _current_user():
     """Best-effort snapshot of the logged-in user for display purposes."""
     user_id = get_current_user_id()
+
+    # If user_id resolved but user_email is still missing/stale (e.g. a
+    # rerun that lost session_state), refresh it from Supabase too.
+    if user_id and not st.session_state.get("user_email"):
+        try:
+            from src.supabase_client import get_supabase
+            sb_user = get_supabase().auth.get_user()
+            if sb_user and sb_user.user:
+                st.session_state.user_email = sb_user.user.email
+        except Exception:
+            pass
+
     email = st.session_state.get("user_email", "")
     name = st.session_state.get("user_display_name")
     if name is None:
@@ -220,8 +232,14 @@ def change_password(current_password: str, new_password: str, confirm_password: 
 def render_profile_menu():
     """Renders the top-right avatar + dropdown (profile details, change
     password, my papers, log out). Call this once near the top of
-    app.py, alongside page_header()."""
+    app.py, alongside page_header(). Renders nothing at all for guest
+    sessions (no user_email) — there's no account to manage, so the
+    trigger button is hidden rather than shown in a permanently
+    "Not signed in" state."""
     user = _current_user()
+    if not user["email"]:
+        return
+
     c = theme_colors()
     initials = _initials(user["name"], user["email"])
 
@@ -238,23 +256,29 @@ def render_profile_menu():
             )
 
             with tab_profile:
-                new_name = st.text_input(
-                    "Display name", value=user["name"], key="profile_name_input"
-                )
-                if st.button("Save name", key="profile_save_name_btn"):
-                    ok, msg = update_display_name(new_name)
-                    (st.success if ok else st.error)(msg)
-                    if ok:
-                        st.rerun()
-                st.caption(f"Email: {user['email'] or '—'}")
+                if not user["email"]:
+                    st.caption("You're browsing as a guest. Sign in to set a display name and save your profile.")
+                else:
+                    new_name = st.text_input(
+                        "Display name", value=user["name"], key="profile_name_input"
+                    )
+                    if st.button("Save name", key="profile_save_name_btn"):
+                        ok, msg = update_display_name(new_name)
+                        (st.success if ok else st.error)(msg)
+                        if ok:
+                            st.rerun()
+                    st.caption(f"Email: {user['email'] or '—'}")
 
             with tab_password:
-                cur_pw = st.text_input("Current password", type="password", key="profile_cur_pw")
-                new_pw = st.text_input("New password", type="password", key="profile_new_pw")
-                confirm_pw = st.text_input("Confirm new password", type="password", key="profile_confirm_pw")
-                if st.button("Update password", key="profile_update_pw_btn"):
-                    ok, msg = change_password(cur_pw, new_pw, confirm_pw)
-                    (st.success if ok else st.error)(msg)
+                if not user["email"]:
+                    st.caption("You're browsing as a guest. Sign in to change your password.")
+                else:
+                    cur_pw = st.text_input("Current password", type="password", key="profile_cur_pw")
+                    new_pw = st.text_input("New password", type="password", key="profile_new_pw")
+                    confirm_pw = st.text_input("Confirm new password", type="password", key="profile_confirm_pw")
+                    if st.button("Update password", key="profile_update_pw_btn"):
+                        ok, msg = change_password(cur_pw, new_pw, confirm_pw)
+                        (st.success if ok else st.error)(msg)
 
             with tab_papers:
                 papers = list_papers(user["user_id"])

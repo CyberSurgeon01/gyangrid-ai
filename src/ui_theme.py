@@ -340,6 +340,81 @@ def inject_base_css():
             font-size: 14px;
         }}
 
+        /* Profile menu trigger button (the avatar/initials pill, top right).
+           st.popover()'s own trigger button ignores our theme by default and
+           renders as a plain white pill — this brings it in line. */
+        div[data-testid="stPopover"] > div > button {{
+            background: {c['surface']} !important;
+            border: 1px solid {c['border']} !important;
+            color: {c['text_primary']} !important;
+            border-radius: 50% !important;
+            width: 40px !important;
+            height: 40px !important;
+            padding: 0 !important;
+            font-weight: 600 !important;
+        }}
+        div[data-testid="stPopover"] > div > button:hover {{
+            border-color: {c['accent']} !important;
+            color: {c['accent']} !important;
+        }}
+
+        /* Profile popover panel — full dark theme to match the rest of
+           the app (card background, text, tabs, dividers, inputs). */
+        div[data-testid="stPopoverBody"],
+        div[data-testid="stPopoverBody"] > div,
+        div[data-testid="stPopoverBody"] [data-testid="stVerticalBlock"],
+        div[data-testid="stPopoverBody"] [data-testid="stVerticalBlockBorderWrapper"],
+        div[data-testid="stPopoverBody"] [data-testid="stElementContainer"] {{
+            background: {c['surface']} !important;
+        }}
+        div[data-testid="stPopoverBody"] {{
+            border: 1px solid {c['border']} !important;
+        }}
+        div[data-testid="stPopoverBody"] h1,
+        div[data-testid="stPopoverBody"] h2,
+        div[data-testid="stPopoverBody"] h3,
+        div[data-testid="stPopoverBody"] h4,
+        div[data-testid="stPopoverBody"] p,
+        div[data-testid="stPopoverBody"] span,
+        div[data-testid="stPopoverBody"] label,
+        div[data-testid="stPopoverBody"] [data-testid="stMarkdownContainer"],
+        div[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] {{
+            color: #FFFFFF !important;
+        }}
+        div[data-testid="stPopoverBody"] [data-testid="stCaptionContainer"] p {{
+            color: #FFFFFF !important;
+            opacity: 1 !important;
+        }}
+        div[data-testid="stPopoverBody"] a,
+        div[data-testid="stPopoverBody"] a:visited {{
+            color: #FFFFFF !important;
+            text-decoration: underline;
+        }}
+        div[data-testid="stPopoverBody"] hr {{
+            border-color: {c['border']} !important;
+        }}
+        div[data-testid="stPopoverBody"] [data-testid="stTabs"] button {{
+            color: #FFFFFF !important;
+            opacity: 0.7;
+        }}
+        div[data-testid="stPopoverBody"] [data-testid="stTabs"] button[aria-selected="true"] {{
+            color: #FFFFFF !important;
+            opacity: 1;
+        }}
+        div[data-testid="stPopoverBody"] div[data-testid="stTextInput"] > div {{
+            background: {c['surface_muted']} !important;
+            border: 1.5px solid {c['border']} !important;
+        }}
+        div[data-testid="stPopoverBody"] div[data-testid="stTextInput"] input {{
+            background: {c['surface_muted']} !important;
+            color: {c['text_primary']} !important;
+        }}
+        div[data-testid="stPopoverBody"] div[data-testid="stTextInput"] button {{
+            background: {c['surface_muted']} !important;
+            border-left: 1px solid {c['border']} !important;
+            color: {c['text_secondary']} !important;
+        }}
+
         .gg-title {{
             font-size: 34px;
             font-weight: 600;
