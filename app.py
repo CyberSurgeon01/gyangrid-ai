@@ -1,4 +1,5 @@
-from src.llm_pipeline import analyze_paper, answer_question, _expand_query, classify_is_research_paper
+from src.llm_pipeline import answer_question, _expand_query, classify_is_research_paper
+from src.background_analysis import start_analysis, get_analysis_status, clear_analysis
 from src.paper_validator import is_research_paper
 from src.report_export import generate_docx_report, generate_pdf_report
 from src.citation_graph import build_citation_graph, most_cited_references, reference_year_distribution
@@ -496,54 +497,108 @@ if page == "AI analysis":
         parsed = st.session_state.parsed
         store = st.session_state.vector_store
         lang_code = st.session_state.get("lang_code", "en")
+        file_hash = st.query_params.get("paper", "")
+        user_id = st.session_state.get("user_id", "")
+        is_guest = st.session_state.get("auth_status") == "guest"
 
         card_open(
             "Full AI analysis",
             "sparkles",
-            caption="Generates novelty, research gap, future work, and a conclusion summary.",
+            caption="Analysis runs in the background — feel free to browse other pages.",
         )
         word_limit = st.slider("Conclusion summary word limit", min_value=50, max_value=300, value=120)
 
-        if st.button("Generate AI analysis", type="primary"):
-            with st.spinner("Retrieving relevant chunks..."):
-                novelty_chunks = store.search(
-                    embed_query("novelty original contribution of this paper"), top_k=5
-                )
-                gap_chunks = store.search(
-                    embed_query("research gap limitation prior work"), top_k=5
-                )
-                future_chunks = store.search(
-                    embed_query("future work directions recommendations"), top_k=5
-                )
-                general_chunks = [
-                    {"section": "title", "text": parsed["title"]},
-                    {"section": "abstract", "text": parsed["abstract"][:1000]},
-                ]
-                chunks_by_type = {
-                    "novelty": novelty_chunks,
-                    "research_gap": gap_chunks,
-                    "future_work": future_chunks,
-                    "general": general_chunks,
-                }
+        # Poll current status from Supabase (or None for guests/no run yet)
+        status_row = None if is_guest else get_analysis_status(user_id, file_hash)
+        current_status = status_row["status"] if status_row else None
 
-            with st.spinner("Brewing insights from your paper..."):
-                try:
-                    analysis = analyze_paper(
-                        chunks_by_type, language=lang_code, word_limit=word_limit
+        col_btn, col_rerun = st.columns([2, 1])
+        with col_btn:
+            btn_label = "Re-run AI analysis" if current_status == "done" else "Generate AI analysis"
+            if st.button(btn_label, type="primary", key="ai_generate_btn"):
+                if is_guest:
+                    # Guests: run inline (no background, no save)
+                    with st.spinner("Brewing insights from your paper..."):
+                        try:
+                            from src.llm_pipeline import analyze_paper
+                            novelty_chunks = store.search(embed_query("novelty original contribution of this paper"), top_k=5)
+                            gap_chunks = store.search(embed_query("research gap limitation prior work"), top_k=5)
+                            future_chunks = store.search(embed_query("future work directions recommendations"), top_k=5)
+                            general_chunks = [
+                                {"section": "title", "text": parsed["title"]},
+                                {"section": "abstract", "text": parsed["abstract"][:1000]},
+                            ]
+                            analysis = analyze_paper(
+                                {"novelty": novelty_chunks, "research_gap": gap_chunks,
+                                 "future_work": future_chunks, "general": general_chunks},
+                                language=lang_code, word_limit=word_limit,
+                            )
+                            st.session_state.last_analysis = analysis
+                            st.session_state.last_analysis_lang = lang_code
+                            st.session_state.pop("audio_analysis", None)
+                        except Exception as e:
+                            st.error(f"Analysis failed: {e}")
+                else:
+                    # Clear previous row so user can re-run
+                    if current_status in ("done", "error"):
+                        clear_analysis(user_id, file_hash)
+
+                    with st.spinner("Retrieving relevant chunks..."):
+                        novelty_chunks = store.search(embed_query("novelty original contribution of this paper"), top_k=5)
+                        gap_chunks = store.search(embed_query("research gap limitation prior work"), top_k=5)
+                        future_chunks = store.search(embed_query("future work directions recommendations"), top_k=5)
+                        general_chunks = [
+                            {"section": "title", "text": parsed["title"]},
+                            {"section": "abstract", "text": parsed["abstract"][:1000]},
+                        ]
+                        chunks_by_type = {
+                            "novelty": novelty_chunks,
+                            "research_gap": gap_chunks,
+                            "future_work": future_chunks,
+                            "general": general_chunks,
+                        }
+
+                    started = start_analysis(
+                        user_id=user_id,
+                        file_hash=file_hash,
+                        file_name=st.session_state.get("processed_file_name", ""),
+                        chunks_by_type=chunks_by_type,
+                        lang_code=lang_code,
+                        word_limit=word_limit,
                     )
-                    st.session_state.last_analysis = analysis
-                    st.session_state.last_analysis_lang = lang_code
-                    st.session_state.pop("audio_analysis", None)
+                    if started:
+                        st.toast("Analysis started in background! Browse other pages freely.", icon="🚀")
+                    st.rerun()
 
-                    # Cache the analysis too, so it survives a refresh
-                    # alongside the paper itself (keyed off the same hash
-                    # that's already sitting in st.query_params).
-                    if "paper" in st.query_params:
-                        save_analysis(st.query_params["paper"], analysis, lang_code)
-                except Exception as e:
-                    st.error(f"Analysis failed: {e}")
+        with col_rerun:
+            if current_status in ("pending", "running"):
+                if st.button("🔄 Refresh status", key="ai_refresh_btn", use_container_width=True):
+                    st.rerun()
+
         card_close()
 
+        # ── Status display ───────────────────────────────────────────────
+        if not is_guest and current_status in ("pending", "running"):
+            card_open("Analysis in progress", "sparkles")
+            st.info("⏳ Analysis is running in the background. You can browse other pages and come back here anytime.", icon="🔄")
+            st.caption("Click 'Refresh status' to check if it's done.")
+            card_close()
+
+        elif not is_guest and current_status == "error":
+            card_open("Analysis failed", "alert-triangle")
+            st.error(f"Something went wrong: {status_row.get('error_msg', 'Unknown error')}")
+            st.caption("Click 'Generate AI analysis' to try again.")
+            card_close()
+
+        elif not is_guest and current_status == "done" and status_row.get("result"):
+            # Load result from Supabase into session_state
+            if st.session_state.get("last_analysis_hash") != file_hash:
+                st.session_state.last_analysis = status_row["result"]
+                st.session_state.last_analysis_lang = status_row.get("lang_code", "en")
+                st.session_state.last_analysis_hash = file_hash
+                st.session_state.pop("audio_analysis", None)
+
+        # ── Render results (works for both guest inline and bg done) ─────
         if "last_analysis" in st.session_state:
             analysis = st.session_state.last_analysis
             paper_title = parsed.get("title") or "Research Paper Analysis"
