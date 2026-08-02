@@ -95,16 +95,19 @@ def start_analysis(user_id: str, file_hash: str, file_name: str,
     sb = get_supabase()
 
     # Check if already running / done
-    existing = (
-        sb.table("analyses")
-        .select("status")
-        .eq("user_id", user_id)
-        .eq("file_hash", file_hash)
-        .maybe_single()
-        .execute()
-    )
-    if existing.data and existing.data["status"] in ("pending", "running"):
-        return False  # already in progress
+    try:
+        existing = (
+            sb.table("analyses")
+            .select("status")
+            .eq("user_id", user_id)
+            .eq("file_hash", file_hash)
+            .maybe_single()
+            .execute()
+        )
+        if existing and existing.data and existing.data.get("status") in ("pending", "running"):
+            return False  # already in progress
+    except Exception:
+        pass  # no existing row — safe to proceed
 
     # Insert pending row immediately so the UI can show a spinner right away
     _upsert_row(sb, user_id, file_hash,
@@ -144,7 +147,7 @@ def get_analysis_status(user_id: str, file_hash: str) -> dict | None:
             .maybe_single()
             .execute()
         )
-        return row.data  # None if no row
+        return row.data if row else None
     except Exception:
         return None
 
