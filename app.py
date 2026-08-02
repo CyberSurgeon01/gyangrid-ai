@@ -34,6 +34,7 @@ from src.ui_theme import (
     empty_state,
     feature_preview_card,
     history_table,
+    json_block,
 )
 
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
@@ -404,7 +405,7 @@ if page == "Dashboard":
             card_close()
 
             card_open("Paper details", "help")
-            st.json({
+            json_block({
                 "title": parsed["title"],
                 "abstract_preview": parsed["abstract"][:300],
                 "num_references": len(parsed["references"]),
@@ -645,7 +646,7 @@ if page == "AI analysis":
             tag_pills(analysis.get("core_tech_tags", []))
 
             with st.expander("Raw JSON"):
-                st.json(analysis)
+                json_block(analysis)
             card_close()
 
             analysis_audio_text = "\n\n".join([

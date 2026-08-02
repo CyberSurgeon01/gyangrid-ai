@@ -8,6 +8,7 @@ Icons are inline SVG (no external CDN) so they can never fail to load.
 """
 
 import base64
+import json
 import textwrap
 import streamlit as st
 from streamlit.components.v1 import html as _components_html
@@ -1324,6 +1325,25 @@ def feature_preview_card(icon: str, title: str, body: str, badge: str = "Coming 
         f'<p>{body}</p>'
         f'<span class="{badge_class}">{badge}</span>'
         f'</div>'
+    )
+
+
+def json_block(data) -> None:
+    """Themed replacement for st.json(). st.json() renders through
+    Streamlit's built-in JSON viewer component, which has its own
+    hardcoded light theme and does not read our CSS variables — that's
+    why it shows up as a bright white box even in dark mode. This
+    renders the same data as plain, syntax-free preformatted text
+    inside a themed card so it matches the rest of the dashboard."""
+    c = _colors()
+    pretty = json.dumps(data, indent=2, ensure_ascii=False)
+    st.html(
+        f'<pre style="background:{c["surface_muted"]};'
+        f'color:{c["text_primary"]};border:1px solid {c["border"]};'
+        f'border-radius:8px;padding:16px;overflow-x:auto;'
+        f'font-family:monospace;font-size:13px;line-height:1.5;'
+        f'margin:0;white-space:pre-wrap;word-break:break-word;">'
+        f'{pretty}</pre>'
     )
 
 
