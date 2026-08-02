@@ -230,7 +230,7 @@ def render_profile_menu():
         with st.popover(initials, use_container_width=True):
             st.markdown(f"**{user['name'] or 'Unnamed user'}**")
             st.caption(user["email"] or "Not signed in")
-            st.caption("Free plan")
+            st.caption("Personal account")
             st.divider()
 
             tab_profile, tab_password, tab_papers = st.tabs(
