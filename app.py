@@ -35,6 +35,18 @@ from src.ui_theme import (
 
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
 
+
+def _is_quota_error(e: Exception) -> bool:
+    msg = str(e).lower()
+    return "429" in msg or "resource_exhausted" in msg or "quota" in msg
+
+
+def _quota_warning():
+    st.warning(
+        "Gemini API quota reached. This resets every minute — wait a moment and try again.",
+        icon="⏳",
+    )
+
 # ── Restore dark-mode preference after a page refresh ───────────────────
 # st.session_state resets on refresh (new browser session), but
 # st.query_params survives it — same trick used below for the loaded
@@ -410,7 +422,10 @@ if page == "Q&A (RAG)":
                         st.markdown("**Answer**")
                         st.write(answer)
                     except Exception as e:
-                        st.error(f"Could not generate an answer: {e}")
+                        if _is_quota_error(e):
+                            _quota_warning()
+                        else:
+                            st.error(f"Could not generate an answer: {e}")
 
                 with st.expander("Show retrieved excerpts (source material)"):
                     for i, r in enumerate(results, start=1):
@@ -537,7 +552,10 @@ if page == "AI analysis":
                             st.session_state.last_analysis_lang = lang_code
                             st.session_state.pop("audio_analysis", None)
                         except Exception as e:
-                            st.error(f"Analysis failed: {e}")
+                            if _is_quota_error(e):
+                                _quota_warning()
+                            else:
+                                st.error(f"Analysis failed: {e}")
                 else:
                     # Clear previous row so user can re-run
                     if current_status in ("done", "error"):

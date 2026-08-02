@@ -73,10 +73,16 @@ def _run_analysis(user_id: str, file_hash: str, file_name: str,
             pass
 
     except Exception as exc:
+        msg = str(exc)
+        # Give users a friendlier message for quota errors
+        if "429" in msg or "resource_exhausted" in msg.lower() or "quota" in msg.lower():
+            friendly = "Gemini API quota reached. Please wait a moment and re-run the analysis."
+        else:
+            friendly = msg
         try:
             _upsert_row(sb, user_id, file_hash,
                         status="error",
-                        error_msg=str(exc),
+                        error_msg=friendly,
                         file_name=file_name)
         except Exception:
             pass
