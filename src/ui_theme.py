@@ -1066,7 +1066,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
             '<div class="gg-avatar">RS</div>'
             '<div class="gg-sidebar-footer-text">'
             f'<span class="gg-sidebar-footer-name">{_footer_name}</span>'
-            '<span class="gg-sidebar-footer-plan">Personal Account</span>'
+            '<span class="gg-sidebar-footer-plan">Personal</span>'
             '</div></div>'
         )
         render_logout_button()

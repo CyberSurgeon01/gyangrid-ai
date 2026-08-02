@@ -26,6 +26,7 @@ def _text_to_mp3_b64(text: str) -> str | None:
     try:
         from gtts import gTTS
     except ImportError:
+        st.session_state["_tts_last_error"] = "gTTS is not installed."
         return None
     try:
         buf = io.BytesIO()
@@ -33,7 +34,8 @@ def _text_to_mp3_b64(text: str) -> str | None:
         tts.write_to_fp(buf)
         buf.seek(0)
         return base64.b64encode(buf.read()).decode("utf-8")
-    except Exception:
+    except Exception as e:
+        st.session_state["_tts_last_error"] = f"{type(e).__name__}: {e}"
         return None
 
 
@@ -176,10 +178,8 @@ def render_audio_player(
                 safe_text = _truncate_for_tts(text)
                 b64 = _text_to_mp3_b64(safe_text)
             if b64 is None:
-                st.warning(
-                    "Audio generation failed. Make sure `gTTS` is installed: "
-                    "`pip install gTTS`"
-                )
+                err = st.session_state.get("_tts_last_error", "Unknown error")
+                st.warning(f"Audio generation failed: {err}")
                 return
             st.session_state[session_key] = b64
 
