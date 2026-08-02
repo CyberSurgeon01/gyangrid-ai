@@ -209,7 +209,13 @@ def _format_wait(reset_at) -> str:
     return f"{minutes}m" if minutes else "less than a minute"
 
 
-def _render_usage_banner(user_id: str):
+def _render_usage_banner(user_id: str) -> bool:
+    """Renders the quota banner and returns whether the Compare button
+    should be disabled (quota exhausted). Keeping this as the single
+    source of truth for 'is quota exhausted' means _run_comparison()
+    never needs to independently render the same warning again after a
+    rejected click — see render_compare_page(), which disables the
+    button using this return value instead."""
     allowed, remaining, next_reset_at = _usage_remaining(user_id)
 
     usage_error = st.session_state.get("_compare_usage_error")
@@ -223,7 +229,7 @@ def _render_usage_banner(user_id: str):
     if remaining == MAX_COMPARES_PER_WINDOW:
         # Nothing used yet in this window — nothing to count down to.
         st.caption(f"🔋 {remaining}/{MAX_COMPARES_PER_WINDOW} comparisons available.")
-        return
+        return False
 
     if allowed:
         # Some slots used, but at least one still free — no countdown yet.
@@ -232,6 +238,7 @@ def _render_usage_banner(user_id: str):
         st.caption(
             f"🔋 {remaining}/{MAX_COMPARES_PER_WINDOW} comparisons left in this 3-hour window."
         )
+        return False
     else:
         wait_str = _format_wait(next_reset_at)
         wait_for = f" You'll get a new slot in {wait_str}." if wait_str else ""
@@ -239,6 +246,7 @@ def _render_usage_banner(user_id: str):
             f"You've used all {MAX_COMPARES_PER_WINDOW} comparisons for this 3-hour window.{wait_for}",
             icon="⏳",
         )
+        return True
 
 
 # ── Ad-hoc (unsaved) upload pipeline ────────────────────────────────────
@@ -356,12 +364,12 @@ def _friendly_compare_error(e: Exception) -> str:
 def _run_comparison(slot_a, slot_b, lang_code: str, user_id: str):
     allowed, remaining, reset_at = _check_and_record_usage(user_id)
     if not allowed:
-        wait_str = _format_wait(reset_at)
-        wait_for = f" You'll get a new slot in {wait_str}." if wait_str else ""
-        st.warning(
-            f"You've used all {MAX_COMPARES_PER_WINDOW} comparisons for this 3-hour window.{wait_for}",
-            icon="⏳",
-        )
+        # Normally unreachable — the Compare button is disabled once
+        # quota is exhausted (see render_compare_page), and the banner
+        # above already tells the user their quota status. This is a
+        # silent safety net only, e.g. for a rare race where quota ran
+        # out between page load and click; no second identical warning
+        # here to avoid stacking on top of the one already shown above.
         return
 
     usage_recorded_at = datetime.now(timezone.utc)
@@ -483,7 +491,7 @@ def render_compare_page():
     hash_by_label = dict(saved_options)
 
     card_open("Compare Research Papers", "layers", caption="Compare sections between two research papers side by side.")
-    _render_usage_banner(user_id)
+    quota_exhausted = _render_usage_banner(user_id)
 
     col_a, col_swap, col_b, col_btn = st.columns([5, 1, 5, 3])
     with col_a:
@@ -500,7 +508,10 @@ def render_compare_page():
     with col_btn:
         st.write("")
         st.write("")
-        run_clicked = st.button("Compare", type="primary", use_container_width=True, key="compare_run_btn")
+        run_clicked = st.button(
+            "Compare", type="primary", use_container_width=True,
+            key="compare_run_btn", disabled=quota_exhausted,
+        )
     card_close()
 
     if run_clicked:
