@@ -14,7 +14,7 @@ from src.audio_player import render_audio_player
 from src.login_page import render_login_page
 from src.signup_page import render_signup_page
 from src.supabase_client import get_supabase
-from src.profile import render_profile_menu, register_paper, get_current_user_id
+from src.profile import render_profile_menu, register_paper, get_current_user_id, list_papers, open_paper
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
@@ -117,6 +117,7 @@ _HAS_PAPER = "processed_file_name" in st.session_state
 _PAGE_COPY = {
     "Dashboard": ("Dashboard", "Overview of your uploaded paper's structure and extracted content."),
     "Upload paper": ("Upload paper", "Upload a research paper and prepare it for AI analysis."),
+    "History": ("History", "All papers you've uploaded — open any of them to pick up right where you left off."),
     "Q&A (RAG)": ("Q&A (RAG)", "Ask grounded questions and get answers sourced directly from the paper."),
     "AI analysis": ("AI Analysis", "Upload a research paper to generate summaries, insights, questions, and citation support."),
     "Citation graph": ("Citation graph", "Visualize how this paper's citations map to its reference list."),
@@ -136,6 +137,9 @@ page_header(
 )
 
 
+MAX_SAVED_PAPERS = 3
+
+
 def process_uploaded_file(uploaded_file):
     """Runs the load -> clean -> parse -> chunk -> embed pipeline once per
     new file, or restores it from disk cache if this exact file was
@@ -144,8 +148,24 @@ def process_uploaded_file(uploaded_file):
     if st.session_state.get("processed_file_name") == uploaded_file.name:
         return
 
+    # Guest users can analyze but cannot save papers
+    is_guest = st.session_state.get("auth_status") == "guest"
+
     file_bytes = uploaded_file.getvalue()  # safe: doesn't disturb the read position load_document() uses
     file_hash = hash_file_bytes(file_bytes)
+
+    # Logged-in users: enforce 3-paper cap before doing any work
+    if not is_guest:
+        user_id = get_current_user_id()
+        existing_papers = list_papers(user_id)
+        already_saved = any(e["file_hash"] == file_hash for e in existing_papers)
+        if not already_saved and len(existing_papers) >= MAX_SAVED_PAPERS:
+            st.warning(
+                f"\u26a0\ufe0f You can only save up to {MAX_SAVED_PAPERS} papers. "
+                "Please remove one from your History before uploading a new one.",
+                icon="\U0001f4c4",
+            )
+            return
 
     cached = load_paper(file_hash)
     if cached:
@@ -163,7 +183,8 @@ def process_uploaded_file(uploaded_file):
             st.session_state.last_analysis = cached_analysis["analysis"]
             st.session_state.last_analysis_lang = cached_analysis["lang_code"]
 
-        register_paper(get_current_user_id(), file_hash, data["file_name"])
+        if not is_guest:
+            register_paper(get_current_user_id(), file_hash, data["file_name"])
         st.session_state.pop(f"audio_paper_{uploaded_file.name}", None)
         st.session_state.pop("audio_analysis", None)
         return
@@ -196,7 +217,8 @@ def process_uploaded_file(uploaded_file):
         store.add_chunks(embedded_chunks)
 
     save_paper(file_hash, uploaded_file.name, cleaned_text, chunks, parsed, section_chunks, store)
-    register_paper(get_current_user_id(), file_hash, uploaded_file.name)
+    if not is_guest:
+        register_paper(get_current_user_id(), file_hash, uploaded_file.name)
 
     st.session_state.processed_file_name = uploaded_file.name
     st.session_state.cleaned_text = cleaned_text
@@ -223,9 +245,64 @@ def require_document():
     return False
 
 
+# ── History page ─────────────────────────────────────────────────────────
+if page == "History":
+    _papers = list_papers(get_current_user_id())
+    if not _papers:
+        empty_state(
+            "clock",
+            "No papers yet",
+            "Papers you upload will show up here so you can reopen them anytime.",
+        )
+    else:
+        for _entry in _papers:
+            card_open(_entry["file_name"], "file-text", caption=_entry["uploaded_at"][:16].replace("T", " "))
+            _open_col, _remove_col = st.columns([1, 1])
+            with _open_col:
+                if st.button(
+                    "Open — analyze, ask questions, view graph",
+                    key=f"history_open_{_entry['file_hash']}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    if open_paper(_entry["file_hash"]):
+                        st.rerun()
+                    else:
+                        st.error("That paper's cache is gone — it may need to be re-uploaded.")
+            with _remove_col:
+                if st.button(
+                    "Remove from history",
+                    key=f"history_remove_{_entry['file_hash']}",
+                    use_container_width=True,
+                ):
+                    from src.profile import remove_paper
+                    remove_paper(get_current_user_id(), _entry["file_hash"])
+                    st.rerun()
+            card_close()
+
 # ── Upload paper page ───────────────────────────────────────────────────
 if page in ("Dashboard", "Upload paper"):
     card_open("Upload a research paper", "upload")
+
+    # Guest notice
+    if st.session_state.get("auth_status") == "guest":
+        st.info(
+            "You're browsing as a guest — you can analyze papers but they won't be saved. "
+            "Sign in to save up to 3 papers to your account.",
+            icon="ℹ️",
+        )
+    else:
+        # Show remaining slots for logged-in users
+        _saved_count = len(list_papers(get_current_user_id()))
+        _remaining = MAX_SAVED_PAPERS - _saved_count
+        if _remaining <= 0:
+            st.warning(
+                f"📄 You've used all {MAX_SAVED_PAPERS} paper slots. "
+                "Remove a paper from History to upload a new one.",
+            )
+        else:
+            st.caption(f"📄 {_saved_count}/{MAX_SAVED_PAPERS} papers saved — {_remaining} slot(s) remaining.")
+
     uploaded_file = st.file_uploader(
         "Upload PDF or DOCX", type=["pdf", "docx"], label_visibility="collapsed"
     )

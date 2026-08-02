@@ -261,21 +261,26 @@ def render_profile_menu():
                 if not papers:
                     st.caption("No papers uploaded yet.")
                 else:
+                    st.caption("Tap a paper to load it as your current paper.")
                     for entry in papers:
-                        row_l, row_o, row_x = st.columns([5, 1, 1])
-                        with row_l:
-                            st.write(entry["file_name"])
-                            st.caption(entry["uploaded_at"][:16].replace("T", " "))
-                        with row_o:
-                            if st.button("Open", key=f"profile_open_{entry['file_hash']}"):
-                                if open_paper(entry["file_hash"]):
-                                    st.rerun()
-                                else:
-                                    st.error("That paper's cache is gone.")
-                        with row_x:
-                            if st.button("✕", key=f"profile_remove_{entry['file_hash']}"):
-                                remove_paper(user["user_id"], entry["file_hash"])
+                        uploaded_label = entry["uploaded_at"][:16].replace("T", " ")
+                        if st.button(
+                            f"📄 {entry['file_name']}\n\n{uploaded_label}",
+                            key=f"profile_open_{entry['file_hash']}",
+                            use_container_width=True,
+                        ):
+                            if open_paper(entry["file_hash"]):
                                 st.rerun()
+                            else:
+                                st.error("That paper's cache is gone.")
+                        if st.button(
+                            "Remove from my papers",
+                            key=f"profile_remove_{entry['file_hash']}",
+                            use_container_width=True,
+                        ):
+                            remove_paper(user["user_id"], entry["file_hash"])
+                            st.rerun()
+                        st.divider()
 
             st.divider()
             if st.button("Log out", use_container_width=True, key="profile_logout_btn"):

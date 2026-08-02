@@ -1013,6 +1013,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
         ("Workspace", [
             ("layout-dashboard", "Dashboard"),
             ("file-up", "Upload paper"),
+            ("clock", "History"),
         ]),
         ("AI Tools", [
             ("message-question", "Q&A (RAG)"),
