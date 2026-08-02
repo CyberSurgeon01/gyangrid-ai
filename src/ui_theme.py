@@ -283,6 +283,7 @@ def inject_base_css():
     c = _colors()
     is_dark = st.session_state.get("dark_mode", False)
     popover_text = "#FFFFFF" if is_dark else c["text_primary"]
+    strong_container_border = "#3d5a80" if is_dark else "#c2cfe0"
     
     dark_extra = f"""
         .gg-card {{
@@ -418,6 +419,30 @@ def inject_base_css():
             background: {c['surface_muted']} !important;
             border-left: 1px solid {c['border']} !important;
             color: {c['text_secondary']} !important;
+        }}
+
+        /* History rows — now use st.container(border=True) so Streamlit
+           widgets (columns, buttons) are properly nested inside.
+           We override the default border/bg/radius to match our design. */
+        .gg-history-row {{
+            background: {c['surface']} !important;
+            border: 1.5px solid {strong_container_border};
+            border-radius: 12px;
+            padding: 14px 20px;
+            margin-bottom: 14px;
+        }}
+        /* Target st.container(border=True) wrappers in the History section.
+           Streamlit renders these as stVerticalBlockBorderWrapper elements.
+           box-shadow is used as a fallback since border can be overridden
+           by Streamlit's own component styles. */
+        [data-testid="stVerticalBlockBorderWrapper"],
+        [data-testid="stVerticalBlockBorderWrapper"] > div {{
+            background: {c['surface']} !important;
+            border: 2px solid {strong_container_border} !important;
+            border-radius: 12px !important;
+            padding: 4px 8px !important;
+            margin-bottom: 10px !important;
+            box-shadow: 0 0 0 2px {strong_container_border} !important;
         }}
 
         .gg-title {{
@@ -1216,6 +1241,20 @@ def card_open(title: str, icon: str, caption: str | None = None, action_html: st
 
 
 def card_close():
+    st.html("</div>")
+
+
+def history_row_open():
+    """Opens a .gg-history-row div — a compact, reliably-bordered
+    wrapper for a single row of Streamlit content (e.g. a History
+    entry's icon/filename/date + action buttons). Must be paired with
+    history_row_close(). Uses raw HTML (like card_open) instead of
+    st.container(border=True), whose native border couldn't be
+    reliably restyled via CSS override."""
+    st.html('<div class="gg-history-row">')
+
+
+def history_row_close():
     st.html("</div>")
 
 

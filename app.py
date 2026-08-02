@@ -36,6 +36,9 @@ from src.ui_theme import (
     history_table,
     json_block,
     theme_colors,
+    icon_svg,
+    history_row_open,
+    history_row_close,
 )
 
 st.set_page_config(page_title="GyanGrid AI", layout="wide")
@@ -290,30 +293,75 @@ if page == "History":
             "Papers you upload will show up here so you can reopen them anytime.",
         )
     else:
-        for _entry in _papers:
-            card_open(_entry["file_name"], "file-text", caption=_entry["uploaded_at"][:16].replace("T", " "))
-            _open_col, _remove_col = st.columns([1, 1])
-            with _open_col:
-                if st.button(
-                    "Open — analyze, ask questions, view graph",
-                    key=f"history_open_{_entry['file_hash']}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    if open_paper(_entry["file_hash"]):
+        c = theme_colors()
+        border_color = "#3d5a80" if st.session_state.get("dark_mode") else "#94a3b8"
+        bg_color = c["surface"]
+
+        for _idx, _entry in enumerate(_papers):
+            _marker_id = f"gg-history-marker-{_idx}"
+            with st.container():
+                st.markdown(
+                    f'<span id="{_marker_id}" style="display:none;"></span>',
+                    unsafe_allow_html=True,
+                )
+                _info_col, _open_col, _remove_col = st.columns([6, 1, 1])
+                with _info_col:
+                    _date_label = _entry["uploaded_at"][:16].replace("T", " ")
+                    st.markdown(
+                        f'<div style="display:flex;align-items:center;gap:10px;padding:6px 0;">'
+                        f'{icon_svg("file-text", 18, c["text_secondary"])}'
+                        f'<span style="font-weight:600;color:{c["text_primary"]};">{_entry["file_name"]}</span>'
+                        f'<span style="color:{c["text_secondary"]};font-size:12px;">{_date_label}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True,
+                    )
+                with _open_col:
+                    if st.button(
+                        "Open",
+                        key=f"history_open_{_entry['file_hash']}",
+                        type="primary",
+                        use_container_width=True,
+                        help="Analyze, ask questions, view graph",
+                    ):
+                        if open_paper(_entry["file_hash"]):
+                            st.rerun()
+                        else:
+                            st.error("That paper's cache is gone — it may need to be re-uploaded.")
+                with _remove_col:
+                    if st.button(
+                        "🗑",
+                        key=f"history_remove_{_entry['file_hash']}",
+                        use_container_width=True,
+                        help="Remove from history",
+                    ):
+                        from src.profile import remove_paper
+                        remove_paper(get_current_user_id(), _entry["file_hash"])
                         st.rerun()
-                    else:
-                        st.error("That paper's cache is gone — it may need to be re-uploaded.")
-            with _remove_col:
-                if st.button(
-                    "Remove from history",
-                    key=f"history_remove_{_entry['file_hash']}",
-                    use_container_width=True,
-                ):
-                    from src.profile import remove_paper
-                    remove_paper(get_current_user_id(), _entry["file_hash"])
-                    st.rerun()
-            card_close()
+
+                st.components.v1.html(
+                    f"""<script>
+                    (function() {{
+                        function applyBorder() {{
+                            var marker = window.parent.document.getElementById('{_marker_id}');
+                            if (!marker) {{ setTimeout(applyBorder, 50); return; }}
+                            var el = marker;
+                            while (el && el !== window.parent.document.body) {{
+                                el = el.parentElement;
+                                if (el && el.getAttribute('data-testid') === 'stVerticalBlock') {{
+                                    el.style.setProperty('border', '2px solid {border_color}', 'important');
+                                    el.style.setProperty('border-radius', '12px', 'important');
+                                    el.style.setProperty('padding', '10px 16px', 'important');
+                                    el.style.setProperty('margin-bottom', '12px', 'important');
+                                    el.style.setProperty('background', '{bg_color}', 'important');
+                                    break;
+                                }}
+                            }}
+                        }}
+                        applyBorder();
+                    }})();
+                    </script>""",
+                    height=0,
+                )
 
 # ── Upload paper page ───────────────────────────────────────────────────
 if page in ("Dashboard", "Upload paper"):
