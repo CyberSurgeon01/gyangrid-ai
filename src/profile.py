@@ -312,4 +312,5 @@ def render_profile_menu():
                     pass
                 for key in ("auth_status", "user_name", "user_email", "user_id", "user_display_name"):
                     st.session_state.pop(key, None)
-                st.rerun()
+                st.rerun() 
+                #complete rerun to clear any cached paper/analysis data from session_state, since the next user may not have access to it.
