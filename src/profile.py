@@ -314,3 +314,4 @@ def render_profile_menu():
                     st.session_state.pop(key, None)
                 st.rerun() 
                 #complete rerun to clear any cached paper/analysis data from session_state, since the next user may not have access to it.
+                #complete rerun to clear any cached paper/analysis data from session_state, since the next user may not have access to it.
