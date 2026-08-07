@@ -870,6 +870,123 @@ if page == "Citation graph":
                 st.caption("No reference years could be detected.")
             card_close()
 
+            import plotly.graph_objects as go
+            from src.citation_insights import (
+                citations_per_section,
+                citation_frequency_histogram,
+                citation_density_by_section,
+                self_citation_ratio,
+            )
+
+            c = theme_colors()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            card_open(
+                "Citation count per section",
+                "bar-chart",
+                caption="How many in-text citations appear in each section.",
+            )
+            sec_counts = citations_per_section(graph)
+            if sec_counts:
+                fig = go.Figure(go.Bar(
+                    x=list(sec_counts.keys()), y=list(sec_counts.values()),
+                    marker_color="#1D9E75",
+                ))
+                fig.update_layout(
+                    paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
+                    font_color=c["text_primary"], margin=dict(l=10, r=10, t=10, b=10),
+                    height=320,
+                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                )
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            else:
+                st.caption("No section-tagged citations were found.")
+            card_close()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            card_open(
+                "In-text citation frequency",
+                "hash",
+                caption="How many references get cited once vs. repeatedly.",
+            )
+            freq = citation_frequency_histogram(graph)
+            if freq:
+                fig = go.Figure(go.Bar(
+                    x=list(freq.keys()), y=list(freq.values()),
+                    marker_color="#D4537E",
+                ))
+                fig.update_layout(
+                    paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
+                    font_color=c["text_primary"], margin=dict(l=10, r=10, t=10, b=10),
+                    height=320,
+                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                )
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            else:
+                st.caption("No citation frequency data available.")
+            card_close()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            card_open(
+                "Citation density by section",
+                "activity",
+                caption="Citations per 1,000 words — flags under-cited sections.",
+            )
+            section_word_counts = {
+                name: len(text.split())
+                for name, text in (parsed.get("sections") or {}).items()
+            }
+            density_rows = citation_density_by_section(graph, section_word_counts)
+            if density_rows:
+                fig = go.Figure(go.Bar(
+                    x=[r["section"] for r in density_rows],
+                    y=[r["density"] for r in density_rows],
+                    marker_color="#BA7517",
+                ))
+                fig.update_layout(
+                    paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
+                    font_color=c["text_primary"], margin=dict(l=10, r=10, t=10, b=10),
+                    height=320,
+                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                    yaxis=dict(
+                        gridcolor=c["border"], color=c["text_primary"],
+                        title="citations / 1k words",
+                    ),
+                )
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            else:
+                st.caption("Not enough section text to compute density.")
+            card_close()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            card_open(
+                "Self-citation vs external",
+                "users",
+                caption="Share of citations pointing to the paper's own prior work.",
+            )
+            ratio = self_citation_ratio(graph, parsed.get("authors"))
+            if ratio is None:
+                st.caption(
+                    "Not available yet — the parser doesn't currently extract the "
+                    "paper's author list, which is needed to detect self-citations."
+                )
+            else:
+                fig = go.Figure(go.Pie(
+                    labels=["Self-citations", "External"],
+                    values=[ratio["self"], ratio["external"]],
+                    marker_colors=["#7F77DD", "#378ADD"],
+                    hole=0.5,
+                ))
+                fig.update_layout(
+                    paper_bgcolor=c["surface"], font_color=c["text_primary"],
+                    margin=dict(l=10, r=10, t=10, b=10), height=300,
+                )
+                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                st.caption(f"{ratio['self_pct']}% of citations are self-citations.")
+            card_close()
+
 # ── Settings page ────────────────────────────────────────────────────────
 if page == "Settings":
     render_dark_mode_toggle()

@@ -240,6 +240,60 @@ def render_profile_menu():
     c = theme_colors()
     initials = _initials(user["name"], user["email"])
 
+    # Inject CSS using the exact data-testid Streamlit 1.52 assigns to the
+    # popover trigger button: "stPopoverButton". We also zero out the
+    # container width override that Streamlit forces on it so the circle
+    # doesn't stretch to fill the column.
+    st.markdown(
+        f"""
+        <style>
+        /* Popover button container — prevent Streamlit's width:100% override */
+        [data-testid="stPopover"] {{
+            width: 40px !important;
+            min-width: 40px !important;
+        }}
+        /* The actual button */
+        [data-testid="stPopoverButton"] {{
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            max-width: 40px !important;
+            padding: 0 !important;
+            border-radius: 50% !important;
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            border: none !important;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.30) !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            cursor: pointer !important;
+        }}
+        [data-testid="stPopoverButton"]:hover {{
+            background-color: #1d4ed8 !important;
+            box-shadow: 0 4px 14px rgba(37,99,235,0.45) !important;
+        }}
+        [data-testid="stPopoverButton"]:focus {{
+            outline: none !important;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.35) !important;
+        }}
+        /* Label container inside the button */
+        [data-testid="stPopoverButton"] [data-testid="stMarkdownContainer"],
+        [data-testid="stPopoverButton"] p {{
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1 !important;
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            color: #ffffff !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     spacer, menu_col = st.columns([14, 1])
     with menu_col:
         with st.popover(initials, use_container_width=False):
@@ -313,5 +367,4 @@ def render_profile_menu():
                 for key in ("auth_status", "user_name", "user_email", "user_id", "user_display_name"):
                     st.session_state.pop(key, None)
                 st.rerun() 
-                #complete rerun to clear any cached paper/analysis data from session_state, since the next user may not have access to it.
                 #complete rerun to clear any cached paper/analysis data from session_state, since the next user may not have access to it.
