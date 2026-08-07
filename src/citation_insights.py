@@ -171,3 +171,43 @@ def self_citation_ratio(
         "external": external_count,
         "self_pct": round((self_count / total) * 100, 1),
     }
+
+
+# ── 5. Isolated / orphan nodes ───────────────────────────────────────────
+
+def orphan_citations(graph: Dict[str, Any]) -> Dict[str, Any]:
+    """Returns both directions of the "orphan" problem this citation graph
+    can surface:
+
+        {
+            "uncited_references": [{"ref_id", "label", "year"}, ...],
+            "unmatched_markers": {"numeric": [...], "author_year": [...]},
+        }
+
+    `uncited_references` — reference-list entries that exist but were
+    never matched to any in-text citation marker (times_cited == 0).
+    Derived directly from graph["nodes"], so it works on any graph
+    produced by build_citation_graph() regardless of version.
+
+    `unmatched_markers` — in-text citation markers (e.g. "[8]" or
+    "(Smith, 2020)") that had no matching entry in the reference list.
+    Read from graph["unmatched_citations"] if present. Older graphs built
+    before that key existed will simply get empty lists here rather than
+    raising a KeyError — this function is written to degrade gracefully
+    so it doesn't hard-depend on a citation_graph.py version bump.
+    """
+    uncited = [
+        {"ref_id": n["id"], "label": n["label"], "year": n.get("year")}
+        for n in graph.get("nodes", [])
+        if n.get("type") == "reference" and (n.get("times_cited") or 0) == 0
+    ]
+
+    unmatched = graph.get("unmatched_citations") or {"numeric": [], "author_year": []}
+
+    return {
+        "uncited_references": uncited,
+        "unmatched_markers": {
+            "numeric": list(unmatched.get("numeric", [])),
+            "author_year": list(unmatched.get("author_year", [])),
+        },
+    }

@@ -799,14 +799,24 @@ if page == "Citation graph":
                         )
                     else:
                         weight = n["times_cited"] or 0
+                        # Full reference text for the hover tooltip (falls
+                        # back to the short label if raw_text is missing,
+                        # e.g. on graphs built before this field existed).
+                        full_text = n.get("raw_text") or n["label"]
+                        tooltip = f"{full_text} — cited {weight}x"
+                        node_url = n.get("url")
                         net.add_node(
                             n["id"],
                             label=_truncate_label(n["label"]),
-                            title=f"{n['label']} — cited {weight}x",
+                            title=tooltip,
                             size=10 + min(weight, 6) * 2,
                             color="#378ADD",
                             shape="dot",
                             font={"size": 11, "color": c["text_primary"]},
+                            # Stashed on the node's own data so we can wire
+                            # click-to-open below, only for references that
+                            # actually have a detected URL/DOI.
+                            url=node_url or "",
                         )
 
                 for e in graph["edges"]:
@@ -817,13 +827,46 @@ if page == "Citation graph":
                         )
 
                 graph_html = net.generate_html(notebook=False)
+
+                # pyvis has no built-in "open URL on click" option, so we
+                # append a small script that reads the `url` field we
+                # stashed on each node (see net.add_node(..., url=...)
+                # above) and opens it in a new tab on double-click. Nodes
+                # with no detected URL (url == "") intentionally do
+                # nothing rather than guessing a link.
+                click_script = """
+                <script type="text/javascript">
+                  network.on("doubleClick", function (params) {
+                    if (params.nodes.length > 0) {
+                      var nodeId = params.nodes[0];
+                      var nodeData = network.body.data.nodes.get(nodeId);
+                      if (nodeData && nodeData.url) {
+                        window.open(nodeData.url, "_blank");
+                      }
+                    }
+                  });
+                </script>
+                """
+                graph_html = graph_html.replace("</body>", click_script + "</body>")
+
                 st.components.v1.html(graph_html, height=canvas_height + 20, scrolling=True)
-                st.caption("Hover a node to see its full title. Drag nodes to spread them out further.")
+                st.caption(
+                    "Hover a node to see its full reference. Double-click a node to open its "
+                    "source link (if one was found in the reference). Drag nodes to spread them out further."
+                )
 
                 if section_colors:
-                    st.caption(
-                        "Edge colors by section: "
-                        + ", ".join(f"{sec}" for sec in section_colors.keys())
+                    legend_html = "".join(
+                        f'<span style="display:inline-flex;align-items:center;gap:6px;'
+                        f'margin-right:16px;font-size:13px;">'
+                        f'<span style="width:10px;height:10px;border-radius:50%;'
+                        f'background:{color};display:inline-block;"></span>{section}</span>'
+                        for section, color in section_colors.items()
+                    )
+                    st.caption("Edge colors by section:")
+                    st.markdown(
+                        f'<div style="margin-top:-8px;">{legend_html}</div>',
+                        unsafe_allow_html=True,
                     )
             except ImportError:
                 st.warning(
@@ -835,157 +878,166 @@ if page == "Citation graph":
                 for ref in top_refs:
                     st.write(f"- {ref['label']} — cited {ref['times_cited']}x")
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            card_open(
-                "Reference publication years",
-                "calendar",
-                caption="How recent the literature this paper cites actually is.",
-            )
-            year_dist = reference_year_distribution(graph)
-            if year_dist:
-                import plotly.graph_objects as go
-
-                c = theme_colors()
-                years = list(year_dist.keys())
-                counts = list(year_dist.values())
-
-                fig = go.Figure(
-                    go.Bar(x=years, y=counts, marker_color="#378ADD")
-                )
-                fig.update_layout(
-                    paper_bgcolor=c["surface"],
-                    plot_bgcolor=c["surface"],
-                    font_color=c["text_primary"],
-                    margin=dict(l=10, r=10, t=10, b=10),
-                    height=320,
-                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
-                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
-                )
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                if "unknown" in year_dist:
-                    st.caption(
-                        f"{year_dist['unknown']} reference(s) had no detectable publication year."
-                    )
-            else:
-                st.caption("No reference years could be detected.")
-            card_close()
-
             import plotly.graph_objects as go
             from src.citation_insights import (
                 citations_per_section,
                 citation_frequency_histogram,
                 citation_density_by_section,
                 self_citation_ratio,
+                orphan_citations,
             )
 
             c = theme_colors()
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            card_open(
-                "Citation count per section",
-                "bar-chart",
-                caption="How many in-text citations appear in each section.",
-            )
-            sec_counts = citations_per_section(graph)
-            if sec_counts:
-                fig = go.Figure(go.Bar(
-                    x=list(sec_counts.keys()), y=list(sec_counts.values()),
-                    marker_color="#1D9E75",
-                ))
+            def _themed_bar(x_vals, y_vals, color, y_title=None):
+                fig = go.Figure(go.Bar(x=x_vals, y=y_vals, marker_color=color))
                 fig.update_layout(
                     paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
                     font_color=c["text_primary"], margin=dict(l=10, r=10, t=10, b=10),
-                    height=320,
+                    height=280,
                     xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
-                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
+                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"], title=y_title),
                 )
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-            else:
-                st.caption("No section-tagged citations were found.")
-            card_close()
+                return fig
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            card_open(
-                "In-text citation frequency",
-                "hash",
-                caption="How many references get cited once vs. repeatedly.",
-            )
-            freq = citation_frequency_histogram(graph)
-            if freq:
-                fig = go.Figure(go.Bar(
-                    x=list(freq.keys()), y=list(freq.values()),
-                    marker_color="#D4537E",
-                ))
-                fig.update_layout(
-                    paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
-                    font_color=c["text_primary"], margin=dict(l=10, r=10, t=10, b=10),
-                    height=320,
-                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
-                    yaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
-                )
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-            else:
-                st.caption("No citation frequency data available.")
-            card_close()
+            # ── Row 1: Reference publication years | Citation count per section
+            row1_col1, row1_col2 = st.columns(2)
 
-            st.markdown("<br>", unsafe_allow_html=True)
-            card_open(
-                "Citation density by section",
-                "activity",
-                caption="Citations per 1,000 words — flags under-cited sections.",
-            )
-            section_word_counts = {
-                name: len(text.split())
-                for name, text in (parsed.get("sections") or {}).items()
-            }
-            density_rows = citation_density_by_section(graph, section_word_counts)
-            if density_rows:
-                fig = go.Figure(go.Bar(
-                    x=[r["section"] for r in density_rows],
-                    y=[r["density"] for r in density_rows],
-                    marker_color="#BA7517",
-                ))
-                fig.update_layout(
-                    paper_bgcolor=c["surface"], plot_bgcolor=c["surface"],
-                    font_color=c["text_primary"], margin=dict(l=10, r=10, t=10, b=10),
-                    height=320,
-                    xaxis=dict(gridcolor=c["border"], color=c["text_primary"]),
-                    yaxis=dict(
-                        gridcolor=c["border"], color=c["text_primary"],
-                        title="citations / 1k words",
-                    ),
+            with row1_col1:
+                card_open(
+                    "Reference publication years",
+                    "calendar",
+                    caption="How recent the literature this paper cites actually is.",
                 )
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-            else:
-                st.caption("Not enough section text to compute density.")
-            card_close()
+                year_dist = reference_year_distribution(graph)
+                if year_dist:
+                    fig = _themed_bar(list(year_dist.keys()), list(year_dist.values()), "#378ADD")
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    if "unknown" in year_dist:
+                        st.caption(
+                            f"{year_dist['unknown']} reference(s) had no detectable publication year."
+                        )
+                else:
+                    st.caption("No reference years could be detected.")
+                card_close()
 
+            with row1_col2:
+                card_open(
+                    "Citation count per section",
+                    "bar-chart",
+                    caption="How many in-text citations appear in each section.",
+                )
+                sec_counts = citations_per_section(graph)
+                if sec_counts:
+                    fig = _themed_bar(list(sec_counts.keys()), list(sec_counts.values()), "#1D9E75")
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                else:
+                    st.caption("No section-tagged citations were found.")
+                card_close()
+
+            # ── Row 2: In-text citation frequency | Citation density by section
             st.markdown("<br>", unsafe_allow_html=True)
-            card_open(
-                "Self-citation vs external",
-                "users",
-                caption="Share of citations pointing to the paper's own prior work.",
-            )
-            ratio = self_citation_ratio(graph, parsed.get("authors"))
-            if ratio is None:
-                st.caption(
-                    "Not available yet — the parser doesn't currently extract the "
-                    "paper's author list, which is needed to detect self-citations."
+            row2_col1, row2_col2 = st.columns(2)
+
+            with row2_col1:
+                card_open(
+                    "In-text citation frequency",
+                    "hash",
+                    caption="How many references get cited once vs. repeatedly.",
                 )
-            else:
-                fig = go.Figure(go.Pie(
-                    labels=["Self-citations", "External"],
-                    values=[ratio["self"], ratio["external"]],
-                    marker_colors=["#7F77DD", "#378ADD"],
-                    hole=0.5,
-                ))
-                fig.update_layout(
-                    paper_bgcolor=c["surface"], font_color=c["text_primary"],
-                    margin=dict(l=10, r=10, t=10, b=10), height=300,
+                freq = citation_frequency_histogram(graph)
+                if freq:
+                    fig = _themed_bar(list(freq.keys()), list(freq.values()), "#D4537E")
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                else:
+                    st.caption("No citation frequency data available.")
+                card_close()
+
+            with row2_col2:
+                card_open(
+                    "Citation density by section",
+                    "activity",
+                    caption="Citations per 1,000 words — flags under-cited sections.",
                 )
-                st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-                st.caption(f"{ratio['self_pct']}% of citations are self-citations.")
-            card_close()
+                section_word_counts = {
+                    name: len(text.split())
+                    for name, text in (parsed.get("sections") or {}).items()
+                }
+                density_rows = citation_density_by_section(graph, section_word_counts)
+                if density_rows:
+                    fig = _themed_bar(
+                        [r["section"] for r in density_rows],
+                        [r["density"] for r in density_rows],
+                        "#BA7517",
+                        y_title="citations / 1k words",
+                    )
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                else:
+                    st.caption("Not enough section text to compute density.")
+                card_close()
+
+            # ── Row 3: Self-citation vs external | Isolated/orphan citations
+            st.markdown("<br>", unsafe_allow_html=True)
+            row3_col1, row3_col2 = st.columns(2)
+
+            with row3_col1:
+                card_open(
+                    "Self-citation vs external",
+                    "users",
+                    caption="Share of citations pointing to the paper's own prior work.",
+                )
+                ratio = self_citation_ratio(graph, parsed.get("authors"))
+                if ratio is None:
+                    st.caption(
+                        "Not available yet — the parser doesn't currently extract the "
+                        "paper's author list, which is needed to detect self-citations."
+                    )
+                else:
+                    fig = go.Figure(go.Pie(
+                        labels=["Self-citations", "External"],
+                        values=[ratio["self"], ratio["external"]],
+                        marker_colors=["#7F77DD", "#378ADD"],
+                        hole=0.5,
+                    ))
+                    fig.update_layout(
+                        paper_bgcolor=c["surface"], font_color=c["text_primary"],
+                        margin=dict(l=10, r=10, t=10, b=10), height=280,
+                    )
+                    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+                    st.caption(f"{ratio['self_pct']}% of citations are self-citations.")
+                card_close()
+
+            with row3_col2:
+                card_open(
+                    "Isolated / orphan citations",
+                    "alert-triangle",
+                    caption="References never cited in text, and in-text markers with no matching reference.",
+                )
+                orphans = orphan_citations(graph)
+                uncited = orphans["uncited_references"]
+                unmatched = orphans["unmatched_markers"]
+
+                if not uncited and not unmatched["numeric"] and not unmatched["author_year"]:
+                    st.caption("No orphan citations found — every reference is cited, and every in-text marker resolved.")
+                else:
+                    if uncited:
+                        st.markdown(f"**{len(uncited)} reference(s) never cited in text:**")
+                        for ref in uncited:
+                            year_part = f" ({ref['year']})" if ref.get("year") else ""
+                            st.write(f"- {ref['label']}{year_part}")
+                    else:
+                        st.caption("Every reference in the list was cited at least once.")
+
+                    total_unmatched = len(unmatched["numeric"]) + len(unmatched["author_year"])
+                    if total_unmatched:
+                        st.markdown(f"**{total_unmatched} in-text marker(s) with no matching reference:**")
+                        if unmatched["numeric"]:
+                            st.write("- Numeric: " + ", ".join(f"[{n}]" for n in unmatched["numeric"]))
+                        if unmatched["author_year"]:
+                            st.write("- Author-year: " + ", ".join(unmatched["author_year"]))
+                    else:
+                        st.caption("Every in-text citation marker matched a reference.")
+                card_close()
 
 # ── Settings page ────────────────────────────────────────────────────────
 if page == "Settings":

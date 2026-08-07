@@ -147,11 +147,27 @@ def _normalize_reference_entry(entry: Any, index: int) -> Optional[Dict[str, Any
         words = text.split()
         label = " ".join(words[:6]) + ("…" if len(words) > 6 else "")
 
+    # Detect a DOI or bare URL if the reference text contains one, so the
+    # UI can offer a real "open this paper" link instead of guessing one.
+    # DOIs are normalized to a resolvable https://doi.org/... link; a raw
+    # URL already in the text is used as-is. If neither is present, `url`
+    # stays None and callers should not offer a link for this reference.
+    url = None
+    doi_match = re.search(r"\b10\.\d{4,9}/[^\s,;\"'<>]+", text)
+    if doi_match:
+        doi = doi_match.group(0).rstrip(".")
+        url = f"https://doi.org/{doi}"
+    else:
+        url_match = re.search(r"https?://[^\s,;\"'<>]+", text)
+        if url_match:
+            url = url_match.group(0).rstrip(".")
+
     return {
         "ref_id": ref_id,
         "label": label or f"Reference {index}",
         "raw_text": text,
         "year": year,
+        "url": url,
     }
 
 
@@ -328,6 +344,8 @@ def build_citation_graph(
                 "section": None,
                 "times_cited": total,
                 "year": ref.get("year"),
+                "raw_text": ref.get("raw_text"),
+                "url": ref.get("url"),
             }
         )
 
@@ -359,6 +377,10 @@ def build_citation_graph(
         "nodes": nodes,
         "edges": edges,
         "warnings": warnings,
+        "unmatched_citations": {
+            "numeric": sorted(unmatched_numeric),
+            "author_year": sorted(unmatched_author_year),
+        },
     }
 
 
