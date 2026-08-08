@@ -137,6 +137,8 @@ _ICON_PATHS = {
     "gauge": '<path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12L18 6"/><path d="M12 2v3"/>',
     "chevron-right": '<polyline points="9 18 15 12 9 6"/>',
     "arrow-right": '<path d="M5 12h14"/><path d="M13 6l6 6-6 6"/>',
+    "link": '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    "book-open": '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
     "inbox": '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
 }
 
@@ -145,7 +147,7 @@ _STROKE_ICONS = {
     "sun", "help", "file-text", "list", "layers", "grid", "download",
     "trash", "eye", "check", "circle", "target", "alert-triangle",
     "help-circle-q", "book", "gauge", "chevron-right", "arrow-right", "inbox",
-    "layout-dashboard", "file-up", "message-question",
+    "layout-dashboard", "file-up", "message-question", "link", "book-open",
 }
 
 
@@ -800,6 +802,38 @@ def inject_base_css():
             color: #ffffff !important;
         }}
 
+        /* st.link_button renders as div.stLinkButton > a (an anchor), a
+           different DOM shape than div.stButton > button — the rule above
+           never matches it, so it fell through to Streamlit's default
+           white/light styling. Same treatment as secondary buttons above. */
+        div.stLinkButton > a {{
+            border-radius: 10px !important;
+            border: 1px solid {c['border']} !important;
+            background-color: {c['surface']} !important;
+            color: {c['text_primary']} !important;
+            font-size: 16px !important;
+            font-weight: 500 !important;
+            padding: 12px 22px !important;
+            height: auto !important;
+            min-height: 48px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-decoration: none !important;
+        }}
+        div.stLinkButton > a:hover {{
+            border-color: {c['accent']} !important;
+            color: {c['accent']} !important;
+        }}
+        div.stLinkButton > a p {{
+            color: inherit !important;
+        }}
+        div.stLinkButton > a[kind="primary"] {{
+            background-color: {c['accent']} !important;
+            border-color: {c['accent']} !important;
+            color: #ffffff !important;
+        }}
+
         div[data-testid="stTextInput"] input {{
             font-size: 16px !important;
             padding: 12px 14px !important;
@@ -1182,6 +1216,7 @@ def render_sidebar_nav(default: str = "Dashboard") -> str:
             ("sparkles", "AI analysis"),
             ("layers", "Compare"),
             ("quote", "Citation graph"),
+            ("link", "Related Papers"),
         ]),
         ("System", [
             ("settings", "Settings"),
