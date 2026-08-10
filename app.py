@@ -19,6 +19,7 @@ from src.signup_page import render_signup_page
 from src.supabase_client import get_supabase
 from src.profile import render_profile_menu, register_paper, get_current_user_id, list_papers, open_paper
 from src.compare_page import render_compare_page
+from src.related_papers import render_related_papers_page
 from src.ui_theme import (
     inject_base_css,
     render_sidebar_nav,
@@ -159,6 +160,7 @@ _PAGE_COPY = {
     "AI analysis": ("AI Analysis", "Upload a research paper to generate summaries, insights, questions, and citation support."),
     "Compare": ("Compare", "Compare sections between two research papers side by side."),
     "Citation graph": ("Citation graph", "Visualize how this paper's citations map to its reference list."),
+    "Related Papers": ("Related Papers", "Discover the top 10 papers most related to your uploaded paper, powered by OpenAlex."),
     "Settings": ("Settings", "Configure output language and workspace preferences."),
 }
 _title, _subtitle = _PAGE_COPY.get(page, ("GyanGrid AI", ""))
@@ -1038,6 +1040,10 @@ if page == "Citation graph":
                     else:
                         st.caption("Every in-text citation marker matched a reference.")
                 card_close()
+
+# ── Related Papers page ──────────────────────────────────────────────────
+if page == "Related Papers":
+    render_related_papers_page()
 
 # ── Settings page ────────────────────────────────────────────────────────
 if page == "Settings":
