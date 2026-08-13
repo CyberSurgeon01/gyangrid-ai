@@ -1060,4 +1060,5 @@ if page == "Settings":
     )
     st.session_state.lang_code = "bn" if lang_choice and "বাংলা" in lang_choice else "en"
     card_close()
-    #completed 
+    #completed.
+    #need to review this 
