@@ -3,6 +3,8 @@ pymupdf
 python-docx
 python-dotenv
 sentence-transformers
+torch
+torchvision
 faiss-cpu
 google-genai
 reportlab
