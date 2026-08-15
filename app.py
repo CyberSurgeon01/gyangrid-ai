@@ -17,7 +17,7 @@ from src.audio_player import render_audio_player
 from src.login_page import render_login_page
 from src.signup_page import render_signup_page
 from src.supabase_client import get_supabase
-from src.profile import render_profile_menu, register_paper, get_current_user_id, list_papers, open_paper, _load_index
+from src.profile import render_profile_menu, register_paper, get_current_user_id, list_papers, open_paper
 from src.compare_page import render_compare_page
 from src.related_papers import render_related_papers_page
 from src.ui_theme import (
@@ -135,21 +135,8 @@ page = render_sidebar_nav(default="Dashboard")
 # st.session_state resets on refresh (new browser session), but
 # st.query_params survives it — so a hash in the URL is what lets us find
 # the cached pipeline output (and, if present, the AI analysis) on disk.
-#
-# Authorization check: paper_cache.py keys purely by file-content hash
-# with no per-user boundary, so the hash in ?paper=... could belong to
-# any user (e.g. a shared/leaked link, or simply two users uploading the
-# same PDF and colliding on the same cache key). Only restore it if the
-# hash is in the current user's own paper index — guests (no user_id)
-# never have an index, so this always blocks them, which is correct.
-_paper_param = st.query_params.get("paper")
-_uid_for_restore = st.session_state.get("user_id")
-_owns_paper = bool(
-    _uid_for_restore and _paper_param
-    and _paper_param in {e["file_hash"] for e in _load_index(_uid_for_restore)}
-)
-if "processed_file_name" not in st.session_state and _paper_param and _owns_paper:
-    _cached = load_paper(_paper_param)
+if "processed_file_name" not in st.session_state and "paper" in st.query_params:
+    _cached = load_paper(st.query_params["paper"])
     if _cached:
         _data, _store = _cached
         st.session_state.processed_file_name = _data["file_name"]
@@ -159,7 +146,7 @@ if "processed_file_name" not in st.session_state and _paper_param and _owns_pape
         st.session_state.section_chunks = _data["section_chunks"]
         st.session_state.vector_store = _store
 
-        _cached_analysis = load_analysis(_paper_param)
+        _cached_analysis = load_analysis(st.query_params["paper"])
         if _cached_analysis:
             st.session_state.last_analysis = _cached_analysis["analysis"]
             st.session_state.last_analysis_lang = _cached_analysis["lang_code"]
@@ -1073,5 +1060,3 @@ if page == "Settings":
     )
     st.session_state.lang_code = "bn" if lang_choice and "বাংলা" in lang_choice else "en"
     card_close()
-    #completed.
-    #need to review this

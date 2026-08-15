@@ -122,20 +122,10 @@ def remove_paper(user_id: str, file_hash: str):
     _save_index(user_id, entries)
 
 
-def open_paper(user_id: str, file_hash: str) -> bool:
+def open_paper(file_hash: str) -> bool:
     """Loads a cached paper (and its cached analysis, if any) straight
     into session_state and points the URL at it — mirrors the refresh-
-    restore logic in app.py. Returns False if the cache is gone OR if
-    this file_hash isn't in the requesting user's own paper index
-    (prevents loading another user's paper via a guessed/shared hash —
-    paper_cache.py keys purely by file-content hash with no per-user
-    boundary, so this authorization check has to live here instead)."""
-    if not user_id:
-        return False
-    own_hashes = {e["file_hash"] for e in _load_index(user_id)}
-    if file_hash not in own_hashes:
-        return False
-
+    restore logic in app.py. Returns False if the cache is gone."""
     cached = load_paper(file_hash)
     if not cached:
         return False
@@ -354,7 +344,7 @@ def render_profile_menu():
                             key=f"profile_open_{entry['file_hash']}",
                             use_container_width=True,
                         ):
-                            if open_paper(user["user_id"], entry["file_hash"]):
+                            if open_paper(entry["file_hash"]):
                                 st.rerun()
                             else:
                                 st.error("That paper's cache is gone.")
