@@ -1,13 +1,12 @@
 streamlit
 pymupdf
 python-docx
-python-dotenvsentence-transformers
-faiss-cpu
+python-dotenv
 sentence-transformers
 faiss-cpu
 google-generativeai
-google-generativeai
-reportlab
-reportlab
 reportlab
 streamlit-agraph
+supabase
+plotly
+python-docx
