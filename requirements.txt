@@ -4,9 +4,8 @@ python-docx
 python-dotenv
 sentence-transformers
 faiss-cpu
-google-generativeai
+google-generativeai==0.8.5
 reportlab
 streamlit-agraph
 supabase
 plotly
-python-docx
