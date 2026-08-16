@@ -397,6 +397,30 @@ def _inject_auth_css():
     [data-testid="stAlertContentInfo"] p, [data-testid="stAlertContentError"] p {{
         font-size: 16px !important;
     }}
+
+    /* Formal Google-style notice shown when "Continue with Google" is
+       clicked while OAuth verification with Google is still pending. */
+    .gg-google-notice {{
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        margin-top: 12px;
+        padding: 14px 18px;
+        background: {c['surface']};
+        border: 1px solid {c['border']};
+        border-radius: 14px;
+        font-family: "Google Sans", Roboto, Arial, sans-serif;
+    }}
+    .gg-google-notice svg {{
+        flex: 0 0 auto;
+        margin-top: 1px;
+    }}
+    .gg-google-notice p {{
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+        color: {c['text_secondary']};
+    }}
     </style>
     """)
 
@@ -464,15 +488,16 @@ def render_login_page():
     st.html('<div class="gg-auth-divider">OR</div>')
 
     if st.button("Continue with Google", use_container_width=True, key="login_google"):
-        st.info(
-            "**Google sign-in is temporarily unavailable.**\n\n"
-            "GyanGrid AI is currently undergoing verification with Google to enable "
-            "third-party sign-in. During this period, access via Google Account is "
-            "restricted.\n\n"
-            "Please sign in using your email address and password. "
-            "If you do not have an account, you may create one using the sign-up form.",
-            icon="ℹ️",
-        )
+        st.html("""
+        <div class="gg-google-notice">
+            <svg width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 3 1.5 21h21L12 3z" fill="#F9AB00"/>
+                <rect x="11.1" y="9" width="1.8" height="6" fill="#fff"/>
+                <rect x="11.1" y="16.2" width="1.8" height="1.8" fill="#fff"/>
+            </svg>
+            <p>This feature is under verification and currently available to selected users only. Please continue with manual sign-in below.</p>
+        </div>
+        """)
     if st.button("Continue without login", use_container_width=True, key="login_guest"):
         st.session_state.auth_status = "guest"
         st.rerun()
