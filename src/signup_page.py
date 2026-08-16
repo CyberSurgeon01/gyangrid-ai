@@ -367,7 +367,7 @@ def _inject_auth_css():
 def _redirect_url() -> str:
     """URL Supabase should send the user back to after Google auth. See
     the matching helper in login_page.py for the full explanation."""
-    return st.secrets.get("APP_URL", "http://localhost:8501")
+    return st.secrets.get("APP_URL", "https://gyangrid-ai.streamlit.app")
 
 
 def _send_signup_otp(email: str, password: str, confirm: str) -> str | None:
