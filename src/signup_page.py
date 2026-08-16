@@ -523,7 +523,7 @@ def _render_email_step(c):
                 <rect x="11.1" y="9" width="1.8" height="6" fill="#fff"/>
                 <rect x="11.1" y="16.2" width="1.8" height="1.8" fill="#fff"/>
             </svg>
-            <p>This feature is under verification and currently available to selected users only. Please continue with manual sign-up below.</p>
+            <p>This feature is under verification and currently available to selected users only. Please continue with manual sign-in.</p>
         </div>
         """)
     if st.button("Continue as Guest", use_container_width=True, key="signup_guest"):
