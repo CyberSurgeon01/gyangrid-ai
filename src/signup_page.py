@@ -366,9 +366,8 @@ def _inject_auth_css():
 
 
 def _redirect_url() -> str:
-    """URL Supabase should send the user back to after Google auth. See
-    the matching helper in login_page.py for the full explanation."""
-    return st.secrets.get("APP_URL", "https://gyangrid-ai.streamlit.app")
+    """URL Supabase should send the user back to after Google auth."""
+    return "https://gyangrid-ai.streamlit.app"
 
 
 def _send_signup_otp(email: str, password: str, confirm: str) -> str | None:
@@ -496,7 +495,10 @@ def _render_email_step(c):
             sb = get_supabase()
             result = sb.auth.sign_in_with_oauth({
                 "provider": "google",
-                "options": {"redirect_to": _redirect_url()},
+                "options": {
+                    "redirect_to": _redirect_url(),
+                    "query_params": {"prompt": "select_account"},
+                },
             })
             components.html(f'<script>window.top.location.href = "{result.url}";</script>', height=0)
         except Exception as e:

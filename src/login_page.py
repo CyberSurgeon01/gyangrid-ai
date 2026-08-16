@@ -467,7 +467,10 @@ def render_login_page():
             sb = get_supabase()
             result = sb.auth.sign_in_with_oauth({
                 "provider": "google",
-                "options": {"redirect_to": _redirect_url()},
+                "options": {
+                    "redirect_to": _redirect_url(),
+                    "query_params": {"prompt": "select_account"},
+                },
             })
             components.html(f'<script>window.top.location.href = "{result.url}";</script>', height=0)
         except Exception as e:
