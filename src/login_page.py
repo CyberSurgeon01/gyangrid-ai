@@ -464,26 +464,15 @@ def render_login_page():
     st.html('<div class="gg-auth-divider">OR</div>')
 
     if st.button("Continue with Google", use_container_width=True, key="login_google"):
-        try:
-            sb = get_supabase()
-            result = sb.auth.sign_in_with_oauth({
-                "provider": "google",
-                "options": {
-                    "redirect_to": _redirect_url(),
-                    "skip_browser_redirect": True,
-                },
-            })
-            # Parse the Supabase OAuth URL and inject prompt=select_account
-            # into the nested Google authorization URL inside the 'continue' param
-            parsed = urllib.parse.urlparse(result.url)
-            qs = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
-            # Also inject directly into the top-level URL
-            qs["prompt"] = ["select_account"]
-            new_query = urllib.parse.urlencode(qs, doseq=True)
-            oauth_url = urllib.parse.urlunparse(parsed._replace(query=new_query))
-            components.html(f'<script>window.top.location.href = "{oauth_url}";</script>', height=0)
-        except Exception as e:
-            st.error(f"Google sign-in failed to start: {e}")
+        st.info(
+            "**Google sign-in is temporarily unavailable.**\n\n"
+            "GyanGrid AI is currently undergoing verification with Google to enable "
+            "third-party sign-in. During this period, access via Google Account is "
+            "restricted.\n\n"
+            "Please sign in using your email address and password. "
+            "If you do not have an account, you may create one using the sign-up form.",
+            icon="ℹ️",
+        )
     if st.button("Continue without login", use_container_width=True, key="login_guest"):
         st.session_state.auth_status = "guest"
         st.rerun()
