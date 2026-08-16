@@ -407,7 +407,7 @@ def _redirect_url() -> str:
     deployed, e.g. Streamlit Community Cloud), and falls back to local
     dev's default address otherwise.
     """
-    return st.secrets.get("APP_URL", "http://localhost:8501")
+    return st.secrets.get("APP_URL", "https://gyangrid-ai.streamlit.app")
 
 
 def _sign_in(email: str, password: str) -> str | None:
