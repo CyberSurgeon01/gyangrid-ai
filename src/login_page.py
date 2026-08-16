@@ -69,6 +69,7 @@ Wiring notes:
 """
 
 import base64
+import urllib.parse
 import streamlit as st
 import streamlit.components.v1 as components
 from src.ui_theme import theme_colors, icon_svg
@@ -469,10 +470,18 @@ def render_login_page():
                 "provider": "google",
                 "options": {
                     "redirect_to": _redirect_url(),
-                    "query_params": {"prompt": "select_account"},
+                    "skip_browser_redirect": True,
                 },
             })
-            components.html(f'<script>window.top.location.href = "{result.url}";</script>', height=0)
+            # Parse the Supabase OAuth URL and inject prompt=select_account
+            # into the nested Google authorization URL inside the 'continue' param
+            parsed = urllib.parse.urlparse(result.url)
+            qs = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+            # Also inject directly into the top-level URL
+            qs["prompt"] = ["select_account"]
+            new_query = urllib.parse.urlencode(qs, doseq=True)
+            oauth_url = urllib.parse.urlunparse(parsed._replace(query=new_query))
+            components.html(f'<script>window.top.location.href = "{oauth_url}";</script>', height=0)
         except Exception as e:
             st.error(f"Google sign-in failed to start: {e}")
     if st.button("Continue without login", use_container_width=True, key="login_guest"):
