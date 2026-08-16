@@ -498,7 +498,6 @@ def _render_email_step(c):
                 "options": {"redirect_to": _redirect_url()},
             })
             st.markdown(f'<meta http-equiv="refresh" content="0; url={result.url}">', unsafe_allow_html=True)
-            st.link_button("Continue to Google", result.url, use_container_width=True)
         except Exception as e:
             st.error(f"Google sign-up failed to start: {e}")
     if st.button("Continue as Guest", use_container_width=True, key="signup_guest"):

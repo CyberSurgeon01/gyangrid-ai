@@ -469,7 +469,6 @@ def render_login_page():
                 "options": {"redirect_to": _redirect_url()},
             })
             st.markdown(f'<meta http-equiv="refresh" content="0; url={result.url}">', unsafe_allow_html=True)
-            st.link_button("Continue to Google", result.url, use_container_width=True)
         except Exception as e:
             st.error(f"Google sign-in failed to start: {e}")
     if st.button("Continue without login", use_container_width=True, key="login_guest"):
