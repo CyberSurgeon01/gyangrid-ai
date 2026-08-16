@@ -400,14 +400,8 @@ def _inject_auth_css():
 
 
 def _redirect_url() -> str:
-    """URL Supabase should send the user back to after Google auth.
-
-    Streamlit doesn't expose the browser's own origin server-side, so
-    this relies on an explicit APP_URL secret when set (needed once
-    deployed, e.g. Streamlit Community Cloud), and falls back to local
-    dev's default address otherwise.
-    """
-    return st.secrets.get("APP_URL", "https://gyangrid-ai.streamlit.app")
+    """URL Supabase should send the user back to after Google auth."""
+    return "https://gyangrid-ai.streamlit.app"
 
 
 def _sign_in(email: str, password: str) -> str | None:
