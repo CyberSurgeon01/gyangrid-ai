@@ -70,6 +70,7 @@ Wiring notes:
 
 import base64
 import streamlit as st
+import streamlit.components.v1 as components
 from src.ui_theme import theme_colors, icon_svg
 from src.supabase_client import get_supabase
 
@@ -468,7 +469,7 @@ def render_login_page():
                 "provider": "google",
                 "options": {"redirect_to": _redirect_url()},
             })
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={result.url}">', unsafe_allow_html=True)
+            components.html(f'<script>window.top.location.href = "{result.url}";</script>', height=0)
         except Exception as e:
             st.error(f"Google sign-in failed to start: {e}")
     if st.button("Continue without login", use_container_width=True, key="login_guest"):
