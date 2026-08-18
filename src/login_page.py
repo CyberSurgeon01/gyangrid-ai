@@ -19,11 +19,11 @@ in the viewport.
 
 Everything now runs on an 8px spacing scale (8 / 16 / 24 / 32 / 40 / 48 /
 56 / 64) and a single set of control tokens:
-  - CARD_MAX_WIDTH = 880px   (within the requested 760–900px range)
-  - CARD_PADDING   = 64px 72px
-  - CONTROL_HEIGHT = 64px    (every input AND every button share this)
-  - RADIUS_CARD    = 24px
-  - RADIUS_CONTROL = 14px
+  - CARD_MAX_WIDTH = 700px
+  - CARD_PADDING   = 36px 48px
+  - CONTROL_HEIGHT = 52px    (every input AND every button share this)
+  - RADIUS_CARD    = 20px
+  - RADIUS_CONTROL = 12px
   - RADIUS_PILL    = 12px    (small footer CTA)
 
 --------------------------------------------------------------------------
@@ -115,20 +115,22 @@ def _inject_auth_css():
     [data-testid="stMain"],
     section.main {{
         display: flex !important;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        min-height: 100vh !important;
+        padding: 20px !important;
+        box-sizing: border-box !important;
     }}
     div.block-container {{
-        width: 100%;
-        max-width: 880px !important;
-        margin: 40px auto !important;
-        padding: 64px 72px !important;
+        width: calc(100% - 40px) !important;
+        max-width: 700px !important;
+        margin: auto !important;
+        padding: 36px 48px !important;
         background: {c['surface']};
         border: 1px solid {c['border']};
-        border-radius: 24px;
-        box-shadow: 0 32px 72px rgba(15, 23, 42, 0.16);
+        border-radius: 20px;
+        box-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
     }}
 
     /* ============================================================
@@ -138,43 +140,48 @@ def _inject_auth_css():
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 14px;
+        gap: 10px;
         font-weight: 700;
-        font-size: 34px;
+        font-size: 26px;
         color: {c['text_primary']};
-        margin-bottom: 40px;
+        margin-bottom: 20px;
     }}
     .gg-auth-title {{
         text-align: center;
-        font-size: 60px;
+        font-size: 44px;
         font-weight: 700;
-        line-height: 1.2;
+        line-height: 1.15;
         color: {c['text_primary']};
-        margin-bottom: 16px;
+        margin-bottom: 10px;
     }}
     .gg-auth-subtitle {{
         text-align: center;
-        font-size: 21px;
+        font-size: 14px;
         color: {c['text_secondary']};
-        margin-bottom: 48px;
-        line-height: 1.55;
-        padding: 0 16px;
+        margin-bottom: 28px;
+        line-height: 1.5;
+        padding: 0 12px;
     }}
 
     /* ============================================================
        FORM FIELDS — identical width/height/radius across the board
        ============================================================ */
     label, .stTextInput label p, [data-testid="stWidgetLabel"] p {{
-        font-size: 17px !important;
+        font-size: 15px !important;
         font-weight: 600 !important;
         color: {c['text_primary']};
-        margin-bottom: 8px !important;
+        margin-bottom: 6px !important;
     }}
     div[data-testid="stTextInput"] {{
-        margin-bottom: 24px !important;
+        margin-bottom: 14px !important;
+    }}
+
+    /* Hide Streamlit's built-in "Press Enter to apply" helper text. */
+    [data-testid="InputInstructions"] {{
+        display: none !important;
     }}
     div[data-testid="stTextInput"] > div {{
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         border: 1.5px solid {c['border']} !important;
         background: {c['surface']} !important;
         box-shadow: none !important;
@@ -210,10 +217,10 @@ def _inject_auth_css():
         z-index: 2;
     }}
     div[data-testid="stTextInput"] input {{
-        font-size: 18px !important;
-        height: 64px !important;
-        padding: 0 20px !important;
-        border-radius: 14px !important;
+        font-size: 16px !important;
+        height: 52px !important;
+        padding: 0 16px !important;
+        border-radius: 12px !important;
         border: none !important;
         box-shadow: none !important;
         box-sizing: border-box;
@@ -232,11 +239,11 @@ def _inject_auth_css():
        field, with an 8px-scale gap above the Sign In button. */
     .gg-auth-forgot {{
         text-align: right;
-        margin: -8px 0 32px 0;
+        margin: -2px 0 18px 0;
     }}
     .gg-auth-forgot a {{
         color: {c['accent']};
-        font-size: 17px;
+        font-size: 14px;
         font-weight: 600;
         text-decoration: none;
     }}
@@ -251,14 +258,14 @@ def _inject_auth_css():
        BUTTONS — every button (primary, social, guest) shares the
        same height/radius/typography so nothing looks mismatched.
        ============================================================ */
-    div.stButton {{ margin-bottom: 20px !important; }}
+    div.stButton {{ margin-bottom: 12px !important; }}
     div.stButton > button, div.stDownloadButton > button {{
         width: 100% !important;
-        height: 64px !important;
-        min-height: 64px !important;
-        font-size: 20px !important;
+        height: 52px !important;
+        min-height: 52px !important;
+        font-size: 16px !important;
         font-weight: 600 !important;
-        border-radius: 14px !important;
+        border-radius: 12px !important;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -290,10 +297,10 @@ def _inject_auth_css():
         align-items: center;
         text-align: center;
         color: {c['text_muted']};
-        font-size: 15px;
+        font-size: 13px;
         font-weight: 600;
         letter-spacing: 0.04em;
-        margin: 36px 0;
+        margin: 20px 0;
     }}
     .gg-auth-divider::before, .gg-auth-divider::after {{
         content: "";
@@ -334,7 +341,7 @@ def _inject_auth_css():
         align-items: center !important;
         justify-content: center;
         gap: 4px;
-        margin-top: 32px;
+        margin-top: 14px;
         width: fit-content !important;
         margin-left: auto !important;
         margin-right: auto !important;
@@ -345,12 +352,13 @@ def _inject_auth_css():
         min-width: 0 !important;
     }}
     .gg-auth-footer-text {{
-        font-size: 18px;
+        font-size: 14px;
         line-height: 1;
         color: {c['text_secondary']};
         text-align: right;
         white-space: nowrap;
         margin: 0;
+        transform: translateY(-2px);
     }}
     /* Plain text link: no border, no background, no box — only the
        "Sign Up" label itself is clickable. Selector specificity is
@@ -363,7 +371,7 @@ def _inject_auth_css():
         min-height: 0 !important;
         padding: 0 !important;
         width: auto !important;
-        font-size: 18px !important;
+        font-size: 14px !important;
         font-weight: 600 !important;
         border-radius: 0 !important;
         background: transparent !important;
@@ -462,7 +470,7 @@ def render_login_page():
     _inject_auth_css()
 
     st.html(f"""
-    <div class="gg-auth-logo">{icon_svg('brain', 44, c['accent'])}GyanGrid AI</div>
+    <div class="gg-auth-logo">{icon_svg('brain', 32, c['accent'])}GyanGrid AI</div>
     <div class="gg-auth-title">Welcome back!</div>
     <div class="gg-auth-subtitle">Sign in to access your workspace and pick up right where you left off.</div>
     """)
