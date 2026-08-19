@@ -9,7 +9,7 @@ def _chunk_words(text: str, chunk_size: int = 600, overlap: int = 80) -> list:
     """Split a block of text into overlapping word-count chunks."""
     words = text.split()
     if not words:
-        return []
+        return [] 
 
     chunks = []
     start = 0
