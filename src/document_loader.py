@@ -19,8 +19,8 @@ def extract_pdf_text(file):
         text += f"\n\n--- Page {page_number} ---\n{page_text}"
 
     return text.strip()
-
-
+    # return text.strip()
+     
 def extract_docx_text(file):
     document = Document(file)
     paragraphs = [para.text for para in document.paragraphs if para.text.strip()]
