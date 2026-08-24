@@ -11,7 +11,7 @@ def extract_pdf_text(file):
         # which preserves real paragraph breaks much better than page.get_text()
         blocks = page.get_text("blocks")
         # sort top-to-bottom, left-to-right
-        blocks.sort(key=lambda b: (round(b[1], 1), b[0]))
+        blocks.sort(key=lambda b: (round(b[1], 1),  b[0]))
 
         page_text = "\n\n".join(
             b[4].strip() for b in blocks if b[4].strip()

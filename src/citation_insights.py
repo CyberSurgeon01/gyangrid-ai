@@ -203,6 +203,7 @@ def orphan_citations(graph: Dict[str, Any]) -> Dict[str, Any]:
     ]
 
     unmatched = graph.get("unmatched_citations") or {"numeric": [], "author_year": []}
+    
 
     return {
         "uncited_references": uncited,
