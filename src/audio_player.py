@@ -5,6 +5,11 @@ Uses gTTS to generate audio in-memory and renders a custom HTML5 player
 with a progress bar inside Streamlit.
 
 Only active when language is English ('en').
+
+Dark-mode fix: the player lives inside a st.components.v1.html() iframe
+which is completely isolated from the app's CSS. Colors are injected
+directly into the iframe HTML based on st.session_state.dark_mode so the
+player matches the active theme instead of always showing a white body.
 """
 
 import io
@@ -39,13 +44,50 @@ def _text_to_mp3_b64(text: str) -> str | None:
         return None
 
 
+def _player_colors() -> dict:
+    """Return a color dict that matches the current theme (dark or light)."""
+    is_dark = st.session_state.get("dark_mode", False)
+    if is_dark:
+        return {
+            "body_bg":      "#121A23",   # matches DARK_COLORS["surface"]
+            "player_bg":    "#17212B",   # matches DARK_COLORS["surface_muted"]
+            "border":       "#1e2d3d",
+            "accent_bar":   "#2563eb",   # matches app accent
+            "track_bg":     "#1e2d3d",
+            "btn_bg":       "#2563eb",
+            "btn_hover":    "#3b82f6",
+            "time_color":   "#64748b",
+            "text_color":   "#e2e8f0",
+        }
+    else:
+        return {
+            "body_bg":      "#ffffff",   # matches COLORS["surface"]
+            "player_bg":    "#f1f5f9",   # matches COLORS["surface_muted"]
+            "border":       "#e2e8f0",
+            "accent_bar":   "#2563eb",
+            "track_bg":     "#cbd5e1",
+            "btn_bg":       "#2563eb",
+            "btn_hover":    "#1d4ed8",
+            "time_color":   "#64748b",
+            "text_color":   "#1e293b",
+        }
+
+
 def _build_player_html(b64_audio: str, player_id: str) -> str:
+    t = _player_colors()
     return textwrap.dedent(f"""
     <style>
+      /* ── iframe body: must match app surface so no white bleed shows ── */
+      html, body {{
+        background: {t['body_bg']} !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }}
+
       .gyangrid-player-{player_id} {{
-        background: #1a1d24;
-        border: 1px solid #2d323d;
-        border-left: 4px solid #3d8b9e;
+        background: {t['player_bg']};
+        border: 1px solid {t['border']};
+        border-left: 4px solid {t['accent_bar']};
         border-radius: 6px;
         padding: 14px 18px;
         margin: 10px 0 4px 0;
@@ -55,7 +97,7 @@ def _build_player_html(b64_audio: str, player_id: str) -> str:
         font-family: sans-serif;
       }}
       .gyangrid-player-{player_id} button {{
-        background: #3d8b9e;
+        background: {t['btn_bg']};
         border: none;
         border-radius: 50%;
         width: 38px;
@@ -70,7 +112,7 @@ def _build_player_html(b64_audio: str, player_id: str) -> str:
         transition: background 0.2s;
       }}
       .gyangrid-player-{player_id} button:hover {{
-        background: #4ea8be;
+        background: {t['btn_hover']};
       }}
       .progress-wrap-{player_id} {{
         flex: 1;
@@ -83,7 +125,7 @@ def _build_player_html(b64_audio: str, player_id: str) -> str:
         height: 5px;
         -webkit-appearance: none;
         appearance: none;
-        background: #2d323d;
+        background: {t['track_bg']};
         border-radius: 3px;
         cursor: pointer;
         outline: none;
@@ -93,11 +135,11 @@ def _build_player_html(b64_audio: str, player_id: str) -> str:
         width: 13px;
         height: 13px;
         border-radius: 50%;
-        background: #3d8b9e;
+        background: {t['accent_bar']};
         cursor: pointer;
       }}
       .time-label-{player_id} {{
-        color: #8a9ab0;
+        color: {t['time_color']};
         font-size: 12px;
         letter-spacing: 0.3px;
       }}

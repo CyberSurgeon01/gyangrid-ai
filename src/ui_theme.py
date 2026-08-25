@@ -280,6 +280,156 @@ def _sidebar_nav_icon_css(icon_keys: list[tuple[str, str]]) -> str:
     return "".join(rules)
 
 
+
+def _patch_baseweb_selectboxes(c: dict, is_dark: bool) -> None:
+    """Force Streamlit/BaseWeb selectboxes to match the active app theme.
+
+    BaseWeb can place background colors on nested elements and renders the
+    dropdown menu in a portal outside the st.selectbox wrapper.  Apply the
+    active palette directly to the real DOM and re-apply it whenever React
+    recreates the selectbox or popup.
+    """
+    trigger_bg = c["surface_muted"] if is_dark else c["surface"]
+
+    _components_html(
+        f"""
+        <script>
+        (() => {{
+            const parentWin = window.parent;
+            const doc = parentWin.document;
+
+            const COLORS = {{
+                trigger: {json.dumps(trigger_bg)},
+                popup: {json.dumps(c["surface"])},
+                hover: {json.dumps(c["surface_muted"])},
+                border: {json.dumps(c["border"])},
+                text: {json.dumps(c["text_primary"])},
+                muted: {json.dumps(c["text_muted"])},
+                accent: {json.dumps(c["accent"])}
+            }};
+
+            function setStyle(el, prop, value) {{
+                if (!el) return;
+                el.style.setProperty(prop, value, "important");
+            }}
+
+            function patchTrigger() {{
+                doc.querySelectorAll(
+                    '[data-testid="stSelectbox"] [data-baseweb="select"]'
+                ).forEach(select => {{
+                    setStyle(select, "background-color", COLORS.trigger);
+                    setStyle(select, "color", COLORS.text);
+
+                    select.querySelectorAll("div").forEach(el => {{
+                        setStyle(el, "background-color", COLORS.trigger);
+                        setStyle(el, "color", COLORS.text);
+                    }});
+
+                    const control = select.firstElementChild;
+                    if (control) {{
+                        const expanded = !!select.querySelector('[aria-expanded="true"]');
+                        setStyle(control, "background-color", COLORS.trigger);
+                        setStyle(control, "border-color", expanded ? COLORS.accent : COLORS.border);
+                        setStyle(control, "color", COLORS.text);
+                    }}
+
+                    select.querySelectorAll("span").forEach(el => {{
+                        setStyle(el, "color", COLORS.text);
+                    }});
+
+                    select.querySelectorAll("input").forEach(el => {{
+                        setStyle(el, "background-color", COLORS.trigger);
+                        setStyle(el, "color", COLORS.text);
+                        setStyle(el, "caret-color", COLORS.text);
+                    }});
+
+                    select.querySelectorAll("svg, svg *").forEach(el => {{
+                        setStyle(el, "color", COLORS.muted);
+                        setStyle(el, "fill", COLORS.muted);
+                        setStyle(el, "stroke", COLORS.muted);
+                    }});
+                }});
+            }}
+
+            function isSelectPopup(root) {{
+                return !!root && (
+                    root.matches('[role="listbox"]') ||
+                    !!root.querySelector('[role="listbox"], [role="option"]')
+                );
+            }}
+
+            function patchPopup() {{
+                doc.querySelectorAll(
+                    '[data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"]'
+                ).forEach(root => {{
+                    if (!isSelectPopup(root)) return;
+
+                    setStyle(root, "background-color", COLORS.popup);
+                    setStyle(root, "color", COLORS.text);
+                    setStyle(root, "border-color", COLORS.border);
+
+                    root.querySelectorAll("div, ul").forEach(el => {{
+                        setStyle(el, "background-color", COLORS.popup);
+                        setStyle(el, "color", COLORS.text);
+                    }});
+                }});
+
+                doc.querySelectorAll('[role="option"]').forEach(option => {{
+                    const owner = option.closest(
+                        '[data-baseweb="popover"], [data-baseweb="menu"], [role="listbox"]'
+                    );
+                    if (!owner) return;
+
+                    const selected = option.getAttribute("aria-selected") === "true";
+                    setStyle(option, "background-color", selected ? COLORS.hover : COLORS.popup);
+                    setStyle(option, "color", COLORS.text);
+
+                    option.querySelectorAll("div, span").forEach(el => {{
+                        setStyle(el, "background-color", "transparent");
+                        setStyle(el, "color", COLORS.text);
+                    }});
+
+                    if (!option.__ggThemeHoverBound) {{
+                        option.__ggThemeHoverBound = true;
+                        option.addEventListener("mouseenter", () => {{
+                            setStyle(option, "background-color", COLORS.hover);
+                        }});
+                        option.addEventListener("mouseleave", () => {{
+                            const stillSelected = option.getAttribute("aria-selected") === "true";
+                            setStyle(option, "background-color", stillSelected ? COLORS.hover : COLORS.popup);
+                        }});
+                    }}
+                }});
+            }}
+
+            function patchAll() {{
+                patchTrigger();
+                patchPopup();
+            }}
+
+            if (parentWin.__ggSelectboxThemeObserver) {{
+                try {{ parentWin.__ggSelectboxThemeObserver.disconnect(); }} catch (e) {{}}
+            }}
+
+            patchAll();
+            setTimeout(patchAll, 25);
+            setTimeout(patchAll, 100);
+            setTimeout(patchAll, 300);
+
+            const observer = new MutationObserver(patchAll);
+            observer.observe(doc.body, {{
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ["aria-expanded", "aria-selected"]
+            }});
+            parentWin.__ggSelectboxThemeObserver = observer;
+        }})();
+        </script>
+        """,
+        height=0,
+    )
+
 def inject_base_css():
     """Injects the global stylesheet. Call once, near the top of app.py."""
     c = _colors()
@@ -303,6 +453,47 @@ def inject_base_css():
         }}
         div.stButton > button[kind="primary"] {{
             box-shadow: 0 4px 14px rgba(108, 142, 245, 0.28);
+        }}
+
+        [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] > div > div > div {{
+            background-color: {c['surface_muted']} !important;
+            border-color: {c['border']} !important;
+            color: {c['text_primary']} !important;
+        }}
+        [data-testid="stSelectbox"] div[data-baseweb="select"] span,
+        [data-testid="stSelectbox"] div[data-baseweb="select"] input {{
+            color: {c['text_primary']} !important;
+            background-color: {c['surface_muted']} !important;
+        }}
+        [data-testid="stSelectbox"] svg {{
+            fill: {c['text_muted']} !important;
+        }}
+        [data-baseweb="popover"] > div,
+        [data-baseweb="menu"] {{
+            background-color: {c['surface']} !important;
+            border: 1px solid {c['border']} !important;
+        }}
+        [data-baseweb="popover"] ul,
+        [data-baseweb="menu"] ul {{
+            background-color: {c['surface']} !important;
+        }}
+        [data-baseweb="popover"] ul li,
+        [data-baseweb="menu"] ul li,
+        [role="option"] {{
+            background-color: {c['surface']} !important;
+            color: {c['text_primary']} !important;
+        }}
+        [data-baseweb="popover"] ul li:hover,
+        [data-baseweb="menu"] ul li:hover,
+        [role="option"]:hover {{
+            background-color: {c['surface_muted']} !important;
+        }}
+        [data-testid="stBaseButton-secondary"] {{
+            background-color: {c['surface_muted']} !important;
+            border: 1px solid {c['border']} !important;
+            color: {c['text_primary']} !important;
         }}
     """ if is_dark else ""
     
@@ -1125,6 +1316,8 @@ def inject_base_css():
         """,
         height=0,
     )
+
+    _patch_baseweb_selectboxes(c, is_dark)
 
 
 def force_center_container(container_key: str):
