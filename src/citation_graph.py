@@ -149,18 +149,36 @@ def _normalize_reference_entry(entry: Any, index: int) -> Optional[Dict[str, Any
 
     # Detect a DOI or bare URL if the reference text contains one, so the
     # UI can offer a real "open this paper" link instead of guessing one.
-    # DOIs are normalized to a resolvable https://doi.org/... link; a raw
-    # URL already in the text is used as-is. If neither is present, `url`
-    # stays None and callers should not offer a link for this reference.
+    # Priority: explicit https URL > real DOI > arXiv ID.
     url = None
-    doi_match = re.search(r"\b10\.\d{4,9}/[^\s,;\"'<>]+", text)
-    if doi_match:
-        doi = doi_match.group(0).rstrip(".")
-        url = f"https://doi.org/{doi}"
+
+    # 1. Prefer an explicit https URL already in the text
+    url_match = re.search(r"https?://[^\s,;\"'<>]+", text)
+    if url_match:
+        url = url_match.group(0).rstrip(".)],")
     else:
-        url_match = re.search(r"https?://[^\s,;\"'<>]+", text)
-        if url_match:
-            url = url_match.group(0).rstrip(".")
+        # 2. ArXiv ID — must be matched BEFORE the generic DOI pattern
+        # because arXiv papers sometimes carry a fake DOI like
+        # 10.48550/arXiv.XXXX which resolves inconsistently. A bare
+        # arXiv ID (e.g. "arXiv:2301.04567" or "arXiv preprint
+        # arXiv:2301.04567") always resolves via arxiv.org.
+        arxiv_match = re.search(
+            r"arXiv\s*(?:preprint\s*)?(?:arXiv\s*:?\s*)?(\d{4}\.\d{4,5}(?:v\d+)?)",
+            text, re.IGNORECASE,
+        )
+        if not arxiv_match:
+            # also catch plain "arXiv:2301.04567" without the repeated word
+            arxiv_match = re.search(r"arXiv\s*:\s*(\d{4}\.\d{4,5}(?:v\d+)?)", text, re.IGNORECASE)
+        if arxiv_match:
+            arxiv_id = arxiv_match.group(1)
+            url = f"https://arxiv.org/abs/{arxiv_id}"
+        else:
+            # 3. Real DOI — exclude the 10.48550 arXiv mirror prefix which
+            # often produces "DOI Not Found" errors for older papers.
+            doi_match = re.search(r"\b(10\.(?!48550)\d{4,9}/[^\s,;\"'<>]+)", text)
+            if doi_match:
+                doi = doi_match.group(1).rstrip(".)],")
+                url = f"https://doi.org/{doi}"
 
     return {
         "ref_id": ref_id,

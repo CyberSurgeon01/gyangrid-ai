@@ -355,6 +355,7 @@ if page == "History":
                         help="Analyze, ask questions, view graph",
                     ):
                         if open_paper(_entry["file_hash"]):
+                            st.session_state.nav_page = "Dashboard"
                             st.rerun()
                         else:
                             st.error("That paper's cache is gone — it may need to be re-uploaded.")
@@ -779,7 +780,7 @@ if page == "Citation graph":
     if require_document():
         parsed = st.session_state.parsed
 
-        graph = build_citation_graph(parsed)
+        graph = build_citation_graph(parsed, full_text=st.session_state.get("cleaned_text"))
         for w in graph["warnings"]:
             st.warning(w)
 
@@ -810,52 +811,69 @@ if page == "Citation graph":
                     bgcolor=c["surface"],
                     font_color=c["text_primary"],
                     directed=True,
-                    cdn_resources="in_line",  # embed JS/CSS so it works offline too
+                    cdn_resources="remote",
                 )
                 net.barnes_hut(
-                    gravity=-6000, central_gravity=0.3,
-                    spring_length=180, spring_strength=0.04,
+                    gravity=-3000, central_gravity=0.5,
+                    spring_length=220, spring_strength=0.06,
+                    damping=0.12,
                 )
+                net.set_options("""
+                var options = {
+                  "nodes": { "borderWidth": 0, "shadow": false },
+                  "edges": {
+                    "arrows": { "to": { "enabled": true, "scaleFactor": 0.5 } },
+                    "smooth": { "type": "dynamic" },
+                    "width": 1.5,
+                    "color": { "opacity": 0.7 }
+                  },
+                  "physics": { "stabilization": { "iterations": 200 } }
+                }
+                """)
 
                 for n in graph["nodes"]:
                     if n["type"] == "paper":
                         net.add_node(
                             n["id"],
-                            label=_truncate_label(n["label"], max_chars=20),
+                            label=_truncate_label(n["label"], max_chars=22),
                             title=n["label"],
-                            size=30,
-                            color="#2C2C2A",
+                            size=36,
+                            color={"background": c["accent"], "border": c["accent"]},
                             shape="dot",
-                            font={"size": 14, "color": c["text_primary"]},
+                            font={"size": 15, "color": "#ffffff", "bold": True},
+                            physics=False,
+                            x=0, y=0,
                         )
                     else:
                         weight = n["times_cited"] or 0
-                        # Full reference text for the hover tooltip (falls
-                        # back to the short label if raw_text is missing,
-                        # e.g. on graphs built before this field existed).
-                        full_text = n.get("raw_text") or n["label"]
-                        tooltip = f"{full_text} — cited {weight}x"
+                        node_full_text = n.get("raw_text") or n["label"]
+                        tooltip = f"[{n.get('ref_id', '')}] {node_full_text}\nCited {weight}x"
                         node_url = n.get("url")
+                        cited_color = "#3B82F6" if weight > 0 else "#4B5563"
                         net.add_node(
                             n["id"],
                             label=_truncate_label(n["label"]),
                             title=tooltip,
-                            size=10 + min(weight, 6) * 2,
-                            color="#378ADD",
+                            size=12 + min(weight, 8) * 3,
+                            color={"background": cited_color, "border": cited_color},
                             shape="dot",
                             font={"size": 11, "color": c["text_primary"]},
-                            # Stashed on the node's own data so we can wire
-                            # click-to-open below, only for references that
-                            # actually have a detected URL/DOI.
                             url=node_url or "",
                         )
 
+                # Add ALL edges (both matched and unmatched) so nothing floats
                 for e in graph["edges"]:
-                    if e["weight"] > 0:
-                        net.add_edge(
-                            e["source"], e["target"],
-                            color=_color_for_section(e["section"]),
-                        )
+                    edge_color = (
+                        _color_for_section(e["section"])
+                        if e["weight"] > 0
+                        else "#2d3748"
+                    )
+                    net.add_edge(
+                        e["source"], e["target"],
+                        color=edge_color,
+                        width=max(1, min(e["weight"], 4)) if e["weight"] > 0 else 0.5,
+                        dashes=e["weight"] == 0,
+                    )
 
                 graph_html = net.generate_html(notebook=False)
 

@@ -130,6 +130,22 @@ def open_paper(file_hash: str) -> bool:
     if not cached:
         return False
     data, store = cached
+
+    # Clear all stale per-paper state before loading the new paper so
+    # nothing from the previous paper bleeds into citation graph, analysis,
+    # audio, Q&A history, or compare results.
+    _stale_keys = [
+        "last_analysis", "last_analysis_lang", "last_analysis_hash",
+        "audio_analysis", "compare_result", "compare_meta",
+        "qa_history", "pending_reject",
+    ]
+    for _k in _stale_keys:
+        st.session_state.pop(_k, None)
+    # Clear audio cache for any previously loaded paper
+    _prev_name = st.session_state.get("processed_file_name")
+    if _prev_name:
+        st.session_state.pop(f"audio_paper_{_prev_name}", None)
+
     st.session_state.processed_file_name = data["file_name"]
     st.session_state.cleaned_text = data["cleaned_text"]
     st.session_state.chunks = data["chunks"]
@@ -142,8 +158,7 @@ def open_paper(file_hash: str) -> bool:
     if cached_analysis:
         st.session_state.last_analysis = cached_analysis["analysis"]
         st.session_state.last_analysis_lang = cached_analysis["lang_code"]
-    else:
-        st.session_state.pop("last_analysis", None)
+        st.session_state.last_analysis_hash = file_hash
 
     st.session_state.nav_page = "Dashboard"
     return True
