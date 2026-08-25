@@ -1,5 +1,6 @@
 """
 Login page for GyanGrid AI.
+(Security fix applied — see _sign_in() notes below.)
 
 Renders a centered auth card (logo, welcome copy, email/password fields,
 forgot-password link, sign-in button, social sign-in button with real
@@ -441,7 +442,13 @@ def _redirect_url() -> str:
 def _sign_in(email: str, password: str) -> str | None:
     """Attempts a real Supabase sign-in. Returns an error message to show
     the user, or None on success (in which case st.session_state has
-    already been populated with the authenticated user)."""
+    already been populated with the authenticated user).
+
+    ⚠️  Security note: after a successful sign-in we explicitly store the
+    access_token and refresh_token on st.session_state (not on the Supabase
+    client singleton).  app.py uses these to restore auth within the same
+    WebSocket session without ever calling get_session() on a shared client.
+    """
     if not email or not password:
         return "Please enter both your email and password."
     if "@" not in email:
@@ -462,6 +469,13 @@ def _sign_in(email: str, password: str) -> str | None:
     st.session_state.auth_status = "user"
     st.session_state.user_email = result.user.email
     st.session_state.user_id = result.user.id
+
+    # Store tokens so app.py can restore auth within the same session
+    # without touching a shared Supabase client instance.
+    if result.session:
+        st.session_state["_access_token"] = result.session.access_token
+        st.session_state["_refresh_token"] = result.session.refresh_token
+
     return None
 
 

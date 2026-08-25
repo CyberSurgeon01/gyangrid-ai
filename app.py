@@ -94,30 +94,41 @@ if "auth_status" not in st.session_state:
 if "code" in st.query_params and st.session_state.auth_status is None:
     try:
         sb = get_supabase()
-        sb.auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
-        session = sb.auth.get_session()
-        if session and session.user:
+        result = sb.auth.exchange_code_for_session({"auth_code": st.query_params["code"]})
+        if result and result.user:
             st.session_state.auth_status = "user"
-            st.session_state.user_email = session.user.email
-            st.session_state.user_id = session.user.id
+            st.session_state.user_email  = result.user.email
+            st.session_state.user_id     = result.user.id
+            if result.session:
+                st.session_state["_access_token"]  = result.session.access_token
+                st.session_state["_refresh_token"] = result.session.refresh_token
     except Exception as e:
         st.session_state.oauth_error = str(e)
     finally:
         st.query_params.pop("code", None)
 
-# Restore Supabase session after an ordinary page refresh (same-tab
-# reload, not a fresh OAuth redirect) — Supabase's Python client persists
-# the session locally, so get_session() alone is enough for that case.
+# Restore auth within the same WebSocket session (e.g. a Streamlit rerun
+# triggered by a widget interaction). Uses tokens stored on THIS session's
+# state — never touches a shared Supabase client — so no cross-user leak.
 if st.session_state.auth_status is None:
-    try:
-        sb = get_supabase()
-        session = sb.auth.get_session()
-        if session and session.user:
-            st.session_state.auth_status = "user"
-            st.session_state.user_email = session.user.email
-            st.session_state.user_id = session.user.id
-    except Exception:
-        pass
+    _access_token  = st.session_state.get("_access_token")
+    _refresh_token = st.session_state.get("_refresh_token")
+    if _access_token and _refresh_token:
+        try:
+            sb = get_supabase()
+            result = sb.auth.set_session(_access_token, _refresh_token)
+            if result and result.user:
+                st.session_state.auth_status = "user"
+                st.session_state.user_email  = result.user.email
+                st.session_state.user_id     = result.user.id
+                # Rotate stored tokens if Supabase issued fresh ones
+                if result.session:
+                    st.session_state["_access_token"]  = result.session.access_token
+                    st.session_state["_refresh_token"] = result.session.refresh_token
+        except Exception:
+            # Tokens expired or invalid — clear and fall through to login
+            st.session_state.pop("_access_token",  None)
+            st.session_state.pop("_refresh_token", None)
 
 if st.session_state.auth_status is None:
     _oauth_err = st.session_state.pop("oauth_error", None)
@@ -135,21 +146,39 @@ page = render_sidebar_nav(default="Dashboard")
 # st.session_state resets on refresh (new browser session), but
 # st.query_params survives it — so a hash in the URL is what lets us find
 # the cached pipeline output (and, if present, the AI analysis) on disk.
+# Security: verify the hash belongs to the current user before loading —
+# without this check anyone with the URL can read another user's paper.
 if "processed_file_name" not in st.session_state and "paper" in st.query_params:
-    _cached = load_paper(st.query_params["paper"])
-    if _cached:
-        _data, _store = _cached
-        st.session_state.processed_file_name = _data["file_name"]
-        st.session_state.cleaned_text = _data["cleaned_text"]
-        st.session_state.chunks = _data["chunks"]
-        st.session_state.parsed = _data["parsed"]
-        st.session_state.section_chunks = _data["section_chunks"]
-        st.session_state.vector_store = _store
+    _requested_hash = st.query_params["paper"]
+    _allow_load = False
 
-        _cached_analysis = load_analysis(st.query_params["paper"])
-        if _cached_analysis:
-            st.session_state.last_analysis = _cached_analysis["analysis"]
-            st.session_state.last_analysis_lang = _cached_analysis["lang_code"]
+    if st.session_state.get("auth_status") == "guest":
+        # Guests have no saved papers — drop the param silently
+        st.query_params.pop("paper", None)
+    else:
+        _user_papers   = list_papers(get_current_user_id())
+        _owned_hashes  = {p["file_hash"] for p in _user_papers}
+        if _requested_hash in _owned_hashes:
+            _allow_load = True
+        else:
+            # Hash doesn't belong to this user — clear it silently
+            st.query_params.pop("paper", None)
+
+    if _allow_load:
+        _cached = load_paper(_requested_hash)
+        if _cached:
+            _data, _store = _cached
+            st.session_state.processed_file_name = _data["file_name"]
+            st.session_state.cleaned_text        = _data["cleaned_text"]
+            st.session_state.chunks              = _data["chunks"]
+            st.session_state.parsed              = _data["parsed"]
+            st.session_state.section_chunks      = _data["section_chunks"]
+            st.session_state.vector_store        = _store
+
+            _cached_analysis = load_analysis(_requested_hash)
+            if _cached_analysis:
+                st.session_state.last_analysis      = _cached_analysis["analysis"]
+                st.session_state.last_analysis_lang = _cached_analysis["lang_code"]
 
 _HAS_PAPER = "processed_file_name" in st.session_state
 _PAGE_COPY = {
