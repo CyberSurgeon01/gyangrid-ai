@@ -4,6 +4,7 @@ A full-stack research paper analysis tool built with Streamlit — search, under
 
 ![GyanGrid AI Demo](assets/gyangrid-demo.gif)
 
+![GyanGrid AI Showcase](assets/gyangrid-showcase-fhd.gif)
 ## Features
 
 - 🔐 **Flexible Authentication** — email/password login, Google OAuth, Gmail-based OTP email verification for sign-up, and a "Continue without login" guest mode. Accounts and data are stored in Supabase.
