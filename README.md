@@ -1,8 +1,11 @@
 # GyanGrid AI
 
-A full-stack research paper analysis tool built with Streamlit — search, understand, and organize academic papers through a RAG-powered assistant.
+**GyanGrid AI** is a full-stack, AI-powered research paper analysis platform built with **Streamlit**, designed to simplify how researchers, students, and academics interact with scholarly literature. Instead of manually reading hundreds of pages to extract key insights, GyanGrid AI enables users to upload research papers and instantly explore them through an intelligent Retrieval-Augmented Generation (RAG) assistant.
 
-![GyanGrid AI Demo](assets/gyangrid-demo.gif)
+The platform combines **Google Gemini**, **FAISS vector search**, **OpenAlex**, **Semantic Scholar**, and **Supabase** to provide a comprehensive research workflow. Users can upload PDF or DOCX papers, ask context-aware questions, generate AI-powered summaries, identify research gaps and future work, compare multiple papers side-by-side, visualize citation relationships, discover related publications, listen to summaries using text-to-speech, and export results as PDF reports.
+
+With secure authentication, persistent document history, semantic search, and an intuitive dashboard, GyanGrid AI transforms traditional literature review into a faster, more interactive, and AI-assisted research experience.
+
 
 ![GyanGrid AI Showcase](assets/gyangrid-showcase-fhd.gif)
 ## Features
@@ -18,6 +21,9 @@ A full-stack research paper analysis tool built with Streamlit — search, under
 - 🔊 **Text-to-Speech** — listen to paper summaries via gTTS
 - 📄 **PDF Export** — export analysis and notes to PDF via LibreOffice
 - 📜 **History** — revisit and reopen previously uploaded papers
+
+
+![GyanGrid AI Demo](assets/gyangrid-demo.gif)
 
 ## Tech Stack
 
@@ -75,7 +81,7 @@ streamlit run app.py
 
 ## License
 
-[Add your license here, e.g. MIT]
+This project is licensed under the [MIT License](LICENSE).
 
 ## Author
 
