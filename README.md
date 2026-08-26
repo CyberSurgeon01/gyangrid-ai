@@ -86,4 +86,4 @@ This project is licensed under the [MIT License](LICENSE).
 ## Author
 
 **Rahul Chandra Shil**
-[LinkedIn](#) · [GitHub](#)
+[https://www.linkedin.com/in/rahul-chandra-shil/](#) · [https://github.com/CyberSurgeon01](#)
